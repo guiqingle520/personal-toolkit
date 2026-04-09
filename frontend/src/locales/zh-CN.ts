@@ -1,0 +1,103 @@
+const zhCN = {
+  app: {
+    title: '任务列表',
+    total: '共 {total} 项',
+    pending: '{pending} 项待办',
+    onThisPage: '本页',
+    syncing: '同步中...',
+    refresh: '刷新',
+    activeTasks: '活动任务',
+    recycleBin: '回收站',
+    manageCategories: '管理分类/标签',
+    localeLabel: '语言',
+  },
+  locale: {
+    en: '英文',
+    zhCN: '中文'
+  },
+  options: {
+    knownCategories: '已知分类',
+    noCategories: '未找到分类。',
+    knownTags: '已知标签',
+    noTags: '未找到标签。',
+  },
+  filter: {
+    search: '搜索关键字...',
+    allStatus: '所有状态',
+    pending: '待办',
+    done: '已完成',
+    allPriorities: '所有优先级',
+    category: '分类',
+    tag: '标签',
+    reset: '重置'
+  },
+  form: {
+    whatNeedsToBeDone: '需要完成什么？',
+    tagsCsv: '标签（逗号分隔）',
+    addTask: '添加任务',
+    addSubtask: '添加子任务',
+    title: '标题',
+    tagsCsvEdit: '标签（逗号分隔）',
+    save: '保存',
+    cancel: '取消'
+  },
+  priority: {
+    critical: '紧急',
+    high: '高',
+    medium: '中',
+    low: '低',
+    backlog: '积压',
+    na: '无'
+  },
+  status: {
+    initiating: '正在初始化神经连接...',
+    empty: '未找到任务。网格很安静。',
+    markAsPending: '标记为待办',
+    markAsDone: '标记为已完成',
+    error: '错误：',
+  },
+  batch: {
+    selectAll: '全选',
+    selected: '已选择 {count} 项',
+    complete: '完成所选',
+    delete: '删除所选',
+    restore: '恢复所选'
+  },
+  action: {
+    edit: '编辑',
+    delete: '删除',
+    restore: '恢复',
+    showChecklist: '显示清单',
+    hideChecklist: '隐藏清单',
+    confirmDeleteSingle: '您确定要删除此任务吗？',
+    confirmDeleteBatch: '删除所选任务？'
+  },
+  checklist: {
+    title: '清单',
+    empty: '还没有子任务。',
+    progress: '已完成 {completed}/{total}',
+    untitled: '未命名子任务'
+  },
+  feedback: {
+    genericError: '发生错误',
+    unexpectedError: '发生了未预期的错误',
+    httpError: 'HTTP 错误 {status}'
+  },
+  pagination: {
+    prev: '← 上一页',
+    next: '下一页 →',
+    pageInfo: '第 {page} 页，共 {total} 页'
+  },
+  recurrence: {
+    none: '无',
+    daily: '每天',
+    weekly: '每周',
+    monthly: '每月',
+    interval: '间隔',
+    endTime: '结束日期',
+    nextTrigger: '计划触发：{time}',
+    completedAt: '完成于：{time}'
+  }
+}
+
+export default zhCN
