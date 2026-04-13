@@ -53,7 +53,7 @@ async function handleLogout() {
           {{ $t('app.onThisPage') }}
         </p>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
+      <div class="header-actions">
         <label class="sr-only" for="locale-switcher">{{ $t('app.localeLabel') }}</label>
         <select id="locale-switcher" :value="locale" class="cyber-input form-sm" :title="$t('app.localeLabel')" :aria-label="$t('app.localeLabel')" @change="$emit('update:locale', ($event.target as HTMLSelectElement).value as AppLocale)">
           <option v-for="option in localeOptions" :key="option.value" :value="option.value">{{ $t(option.labelKey) }}</option>

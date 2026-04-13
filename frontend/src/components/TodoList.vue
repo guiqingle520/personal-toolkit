@@ -606,163 +606,171 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
 <template>
   <section class="todo-panel">
     <div class="glass-bg"></div>
-    <div class="content-wrapper">
-      <TodoToolbar
-        :displayMode="displayMode"
-        @update:displayMode="displayMode = $event" 
-        :pageData="pageData" 
-        :pendingCount="pendingCount"
-        :loading="loading"
-        :viewMode="viewMode"
-        :showOptionsPanel="showOptionsPanel"
-        :locale="locale as AppLocale"
-        @refresh="loadTodos"
-        @update:locale="handleLocaleUpdate"
-        @update:viewMode="viewMode = $event"
-        @update:showOptionsPanel="showOptionsPanel = $event"
-      />
+    <div class="content-wrapper workbench-layout">
+      <div class="workbench-top">
+        <TodoToolbar
+          :displayMode="displayMode"
+          @update:displayMode="displayMode = $event" 
+          :pageData="pageData" 
+          :pendingCount="pendingCount"
+          :loading="loading"
+          :viewMode="viewMode"
+          :showOptionsPanel="showOptionsPanel"
+          :locale="locale as AppLocale"
+          @refresh="loadTodos"
+          @update:locale="handleLocaleUpdate"
+          @update:viewMode="viewMode = $event"
+          @update:showOptionsPanel="showOptionsPanel = $event"
+        />
 
-      <datalist id="category-options">
-        <option v-for="c in options.categories" :key="c" :value="c"></option>
-      </datalist>
-      <datalist id="tag-options">
-        <option v-for="t in options.tags" :key="t" :value="t"></option>
-      </datalist>
-
-      <TodoOptionsPanel 
-        :options="options" 
-        :show="showOptionsPanel"
-      />
-
-      <TodoStatsPanel 
-        v-if="viewMode === 'ACTIVE'"
-        :overview="statsOverview"
-        :categories="statsCategories"
-        :trend="statsTrend"
-      />
-
-      <TodoFilters 
-        v-if="displayMode === 'LIST'"
-        :filters="filters"
-        :categoryListId="CATEGORY_LIST_ID"
-        :tagListId="TAG_LIST_ID"
-        @update:filters="handleFiltersUpdate"
-        @loadTodos="loadTodos"
-        @resetFilters="resetFilters"
-      />
-
-      <TodoCreateForm 
-        v-if="displayMode === 'LIST'"
-        :newTodo="newTodo"
-        :submitting="submitting"
-        :categoryListId="CATEGORY_LIST_ID"
-        :tagListId="TAG_LIST_ID"
-        @update:newTodo="handleNewTodoUpdate"
-        @createTodo="createTodo"
-      />
-
-      <div v-if="errorMessage" class="error-banner">
-        <strong>{{ $t('status.error') }}</strong> {{ errorMessage }}
-        <ul v-if="Object.keys(validationErrors).length > 0" class="validation-list">
-          <li v-for="(errors, field) in validationErrors" :key="field">
-            {{ field }}: {{ errors.join(', ') }}
-          </li>
-        </ul>
+        <datalist id="category-options">
+          <option v-for="c in options.categories" :key="c" :value="c"></option>
+        </datalist>
+        <datalist id="tag-options">
+          <option v-for="t in options.tags" :key="t" :value="t"></option>
+        </datalist>
       </div>
 
-      <TodoEmptyState 
-        :loading="loading"
-        :isEmpty="todos.length === 0"
-      />
+      <div class="workbench-body">
+        <aside class="workbench-sidebar">
+          <TodoStatsPanel 
+            v-if="viewMode === 'ACTIVE'"
+            :overview="statsOverview"
+            :categories="statsCategories"
+            :trend="statsTrend"
+          />
 
-      <div class="batch-actions-bar" v-show="todos.length > 0 && displayMode === 'LIST'">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="isAllSelected" class="cyber-checkbox" /> {{ $t('batch.selectAll') }}
-        </label>
-        <span class="selected-count" v-if="selectedIds.length > 0">{{ $t('batch.selected', { count: selectedIds.length }) }}</span>
-        
-        <div class="batch-buttons" v-if="selectedIds.length > 0">
-          <template v-if="viewMode === 'ACTIVE'">
-            <button class="btn btn-sm btn-success" @click="batchComplete">{{ $t('batch.complete') }}</button>
-            <button class="btn btn-sm btn-danger-outline" @click="batchDelete">{{ $t('batch.delete') }}</button>
-          </template>
-          <template v-else>
-            <button class="btn btn-sm btn-success" @click="batchRestore">{{ $t('batch.restore') }}</button>
-          </template>
-        </div>
+          <TodoFilters 
+            v-if="displayMode === 'LIST'"
+            :filters="filters"
+            :categoryListId="CATEGORY_LIST_ID"
+            :tagListId="TAG_LIST_ID"
+            @update:filters="handleFiltersUpdate"
+            @loadTodos="loadTodos"
+            @resetFilters="resetFilters"
+          />
+        </aside>
+
+        <main class="workbench-main">
+          <TodoOptionsPanel 
+            :options="options" 
+            :show="showOptionsPanel"
+          />
+
+          <TodoCreateForm 
+            v-if="displayMode === 'LIST'"
+            :newTodo="newTodo"
+            :submitting="submitting"
+            :categoryListId="CATEGORY_LIST_ID"
+            :tagListId="TAG_LIST_ID"
+            @update:newTodo="handleNewTodoUpdate"
+            @createTodo="createTodo"
+          />
+
+          <div v-if="errorMessage" class="error-banner">
+            <strong>{{ $t('status.error') }}</strong> {{ errorMessage }}
+            <ul v-if="Object.keys(validationErrors).length > 0" class="validation-list">
+              <li v-for="(errors, field) in validationErrors" :key="field">
+                {{ field }}: {{ errors.join(', ') }}
+              </li>
+            </ul>
+          </div>
+
+          <TodoEmptyState 
+            :loading="loading"
+            :isEmpty="todos.length === 0"
+          />
+
+          <div class="batch-actions-bar" v-show="todos.length > 0 && displayMode === 'LIST'">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="isAllSelected" class="cyber-checkbox" /> {{ $t('batch.selectAll') }}
+            </label>
+            <span class="selected-count" v-if="selectedIds.length > 0">{{ $t('batch.selected', { count: selectedIds.length }) }}</span>
+            
+            <div class="batch-buttons" v-if="selectedIds.length > 0">
+              <template v-if="viewMode === 'ACTIVE'">
+                <button class="btn btn-sm btn-success" @click="batchComplete">{{ $t('batch.complete') }}</button>
+                <button class="btn btn-sm btn-danger-outline" @click="batchDelete">{{ $t('batch.delete') }}</button>
+              </template>
+              <template v-else>
+                <button class="btn btn-sm btn-success" @click="batchRestore">{{ $t('batch.restore') }}</button>
+              </template>
+            </div>
+          </div>
+
+          <TodoItemsList
+            v-if="displayMode === 'LIST'"
+            :todos="todos"
+            :selectedIds="selectedIds"
+            :editingId="editingId"
+            :editTodoForm="editTodoForm"
+            :viewMode="viewMode"
+            :submitting="submitting"
+            :categoryListId="CATEGORY_LIST_ID"
+            :tagListId="TAG_LIST_ID"
+            :expandedTodoIds="expandedTodoIds"
+            :checklistItemsByTodoId="checklistItemsByTodoId"
+            :checklistSummaryByTodoId="checklistSummaryByTodoId"
+            :checklistDraftByTodoId="checklistDraftByTodoId"
+            :checklistLoadingTodoIds="checklistLoadingTodoIds"
+            :checklistCreatingTodoIds="checklistCreatingTodoIds"
+            :checklistPendingSubItemIdsByTodoId="checklistPendingSubItemIdsByTodoId"
+            @update:selected="handleSelectedUpdate"
+            @update:editForm="handleEditFormUpdate"
+            @toggleStatus="toggleStatus"
+            @startEdit="startEdit"
+            @cancelEdit="cancelEdit"
+            @saveEdit="saveEdit"
+            @deleteTodo="deleteTodo"
+            @restoreTodo="restoreTodo"
+            @toggleChecklist="toggleChecklist"
+            @update:checklistDraftTitle="updateChecklistDraftTitle"
+            @createSubItem="createSubItem"
+            @toggleSubItemStatus="toggleSubItemStatus"
+            @deleteSubItem="deleteSubItem"
+          />
+
+          <TodoKanbanView
+            v-if="displayMode === 'KANBAN' && viewMode === 'ACTIVE'"
+            :todos="todos"
+            :selectedIds="selectedIds"
+            :editingId="editingId"
+            :editTodoForm="editTodoForm"
+            :viewMode="viewMode"
+            :submitting="submitting"
+            :categoryListId="CATEGORY_LIST_ID"
+            :tagListId="TAG_LIST_ID"
+            :expandedTodoIds="expandedTodoIds"
+            :checklistItemsByTodoId="checklistItemsByTodoId"
+            :checklistSummaryByTodoId="checklistSummaryByTodoId"
+            :checklistDraftByTodoId="checklistDraftByTodoId"
+            :checklistLoadingTodoIds="checklistLoadingTodoIds"
+            :checklistCreatingTodoIds="checklistCreatingTodoIds"
+            :checklistPendingSubItemIdsByTodoId="checklistPendingSubItemIdsByTodoId"
+            @update:selected="handleSelectedUpdate"
+            @update:editForm="handleEditFormUpdate"
+            @toggleStatus="toggleStatus"
+            @startEdit="startEdit"
+            @cancelEdit="cancelEdit"
+            @saveEdit="saveEdit"
+            @deleteTodo="deleteTodo"
+            @restoreTodo="restoreTodo"
+            @toggleChecklist="toggleChecklist"
+            @update:checklistDraftTitle="updateChecklistDraftTitle"
+            @createSubItem="createSubItem"
+            @toggleSubItemStatus="toggleSubItemStatus"
+            @deleteSubItem="deleteSubItem"
+          />
+
+          <TodoPagination 
+            v-if="displayMode === 'LIST'" 
+            :pageData="pageData"
+            :loading="loading"
+            @prevPage="prevPage"
+            @nextPage="nextPage"
+          />
+        </main>
       </div>
-
-      <TodoItemsList
-        v-if="displayMode === 'LIST'"
-        :todos="todos"
-        :selectedIds="selectedIds"
-        :editingId="editingId"
-        :editTodoForm="editTodoForm"
-        :viewMode="viewMode"
-        :submitting="submitting"
-        :categoryListId="CATEGORY_LIST_ID"
-        :tagListId="TAG_LIST_ID"
-        :expandedTodoIds="expandedTodoIds"
-        :checklistItemsByTodoId="checklistItemsByTodoId"
-        :checklistSummaryByTodoId="checklistSummaryByTodoId"
-        :checklistDraftByTodoId="checklistDraftByTodoId"
-        :checklistLoadingTodoIds="checklistLoadingTodoIds"
-        :checklistCreatingTodoIds="checklistCreatingTodoIds"
-        :checklistPendingSubItemIdsByTodoId="checklistPendingSubItemIdsByTodoId"
-        @update:selected="handleSelectedUpdate"
-        @update:editForm="handleEditFormUpdate"
-        @toggleStatus="toggleStatus"
-        @startEdit="startEdit"
-        @cancelEdit="cancelEdit"
-        @saveEdit="saveEdit"
-        @deleteTodo="deleteTodo"
-        @restoreTodo="restoreTodo"
-        @toggleChecklist="toggleChecklist"
-        @update:checklistDraftTitle="updateChecklistDraftTitle"
-        @createSubItem="createSubItem"
-        @toggleSubItemStatus="toggleSubItemStatus"
-        @deleteSubItem="deleteSubItem"
-      />
-
-      <TodoKanbanView
-        v-if="displayMode === 'KANBAN' && viewMode === 'ACTIVE'"
-        :todos="todos"
-        :selectedIds="selectedIds"
-        :editingId="editingId"
-        :editTodoForm="editTodoForm"
-        :viewMode="viewMode"
-        :submitting="submitting"
-        :categoryListId="CATEGORY_LIST_ID"
-        :tagListId="TAG_LIST_ID"
-        :expandedTodoIds="expandedTodoIds"
-        :checklistItemsByTodoId="checklistItemsByTodoId"
-        :checklistSummaryByTodoId="checklistSummaryByTodoId"
-        :checklistDraftByTodoId="checklistDraftByTodoId"
-        :checklistLoadingTodoIds="checklistLoadingTodoIds"
-        :checklistCreatingTodoIds="checklistCreatingTodoIds"
-        :checklistPendingSubItemIdsByTodoId="checklistPendingSubItemIdsByTodoId"
-        @update:selected="handleSelectedUpdate"
-        @update:editForm="handleEditFormUpdate"
-        @toggleStatus="toggleStatus"
-        @startEdit="startEdit"
-        @cancelEdit="cancelEdit"
-        @saveEdit="saveEdit"
-        @deleteTodo="deleteTodo"
-        @restoreTodo="restoreTodo"
-        @toggleChecklist="toggleChecklist"
-        @update:checklistDraftTitle="updateChecklistDraftTitle"
-        @createSubItem="createSubItem"
-        @toggleSubItemStatus="toggleSubItemStatus"
-        @deleteSubItem="deleteSubItem"
-      />
-
-      <TodoPagination 
-        v-if="displayMode === 'LIST'" 
-        :pageData="pageData"
-        :loading="loading"
-        @prevPage="prevPage"
-        @nextPage="nextPage"
-      />
 
     </div>
   </section>

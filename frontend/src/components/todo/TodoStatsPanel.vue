@@ -99,12 +99,14 @@ const maxTrendValue = computed(() => {
 
 .stats-overview {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-4, 1rem);
   margin-bottom: var(--spacing-4, 1rem);
 }
 
 .stat-box {
   flex: 1;
+  min-width: 100px;
   padding: 1rem;
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-sm, 4px);
@@ -128,6 +130,7 @@ const maxTrendValue = computed(() => {
 
 .stats-row {
   display: flex;
+  flex-direction: column;
   gap: var(--spacing-4, 1rem);
 }
 

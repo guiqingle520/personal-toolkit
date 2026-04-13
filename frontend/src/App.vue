@@ -15,8 +15,12 @@ const { token } = useAuth()
 
 <style scoped>
 main {
-  max-width: 860px;
+  max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
   padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 </style>
