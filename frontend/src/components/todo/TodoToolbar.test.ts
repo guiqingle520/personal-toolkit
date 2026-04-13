@@ -19,6 +19,7 @@ describe('TodoToolbar', () => {
   it('emits refresh, locale change, view mode toggles, and options toggle', async () => {
     const wrapper = mountWithI18n(TodoToolbar, {
       props: {
+        displayMode: 'LIST',
         pageData: createPageData(),
         pendingCount: 3,
         loading: false,
@@ -38,15 +39,19 @@ describe('TodoToolbar', () => {
     await toggleButtons[0].trigger('click')
     await toggleButtons[1].trigger('click')
     await toggleButtons[2].trigger('click')
+    await toggleButtons[3].trigger('click')
+    await toggleButtons[4].trigger('click')
 
     expect(wrapper.emitted('refresh')).toHaveLength(1)
     expect(wrapper.emitted('update:viewMode')).toEqual([['ACTIVE'], ['RECYCLE_BIN']])
+    expect(wrapper.emitted('update:displayMode')).toEqual([['LIST'], ['KANBAN']])
     expect(wrapper.emitted('update:showOptionsPanel')).toEqual([[true]])
   })
 
   it('stabilizes the refresh button width to prevent jitter', async () => {
     const wrapper = mountWithI18n(TodoToolbar, {
       props: {
+        displayMode: 'LIST',
         pageData: createPageData(),
         pendingCount: 3,
         loading: false,

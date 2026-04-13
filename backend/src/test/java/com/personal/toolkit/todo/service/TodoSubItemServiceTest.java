@@ -1,13 +1,14 @@
 package com.personal.toolkit.todo.service;
 
+import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.todo.dto.TodoSubItemRequest;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
 import com.personal.toolkit.todo.entity.TodoSubItem;
 import com.personal.toolkit.todo.repository.TodoRepository;
 import com.personal.toolkit.todo.repository.TodoSubItemRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -25,10 +26,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 验证 TodoSubItemService 的 checklist CRUD 与聚合摘要行为。
+ * 验证 TodoSubItemService 在引入用户隔离后的 checklist CRUD 与缓存驱逐行为。
  */
 @ExtendWith(MockitoExtension.class)
 class TodoSubItemServiceTest {
+
+    private static final Long USER_ID = 101L;
 
     @Mock
     private TodoSubItemRepository todoSubItemRepository;
@@ -39,11 +42,19 @@ class TodoSubItemServiceTest {
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
 
-    @InjectMocks
+    @Mock
+    private CurrentUserProvider currentUserProvider;
+
     private TodoSubItemService todoSubItemService;
 
+    @BeforeEach
+    void setUp() {
+        todoSubItemService = new TodoSubItemService(todoSubItemRepository, todoRepository, redisTemplate, currentUserProvider);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+    }
+
     /**
-     * 创建子任务时应规范化标题、状态和排序值。
+     * 创建子任务时应规范化标题、状态和排序值，并驱逐带 userId 的父任务缓存。
      */
     @Test
     void createShouldNormalizeFields() {
@@ -51,7 +62,7 @@ class TodoSubItemServiceTest {
         request.setTitle("  Write tests  ");
         request.setStatus("done");
 
-        when(todoRepository.existsByIdAndDeletedAtIsNull(1L)).thenReturn(true);
+        when(todoRepository.existsByIdAndUserIdAndDeletedAtIsNull(1L, USER_ID)).thenReturn(true);
         when(todoSubItemRepository.save(any(TodoSubItem.class))).thenAnswer(invocation -> {
             TodoSubItem entity = invocation.getArgument(0);
             entity.setId(10L);
@@ -66,18 +77,18 @@ class TodoSubItemServiceTest {
         assertEquals("Write tests", response.getTitle());
         assertEquals("DONE", response.getStatus());
         assertEquals(0, response.getSortOrder());
-        verify(redisTemplate).delete(TodoCacheKeys.todoItem(1L));
+        verify(redisTemplate).delete(TodoCacheKeys.todoItem(USER_ID, 1L));
     }
 
     /**
-     * 主任务不存在时应拒绝创建子任务。
+     * 主任务不属于当前用户时应拒绝创建子任务，并按未找到处理。
      */
     @Test
-    void createShouldFailWhenParentTodoMissing() {
+    void createShouldFailWhenParentTodoMissingForCurrentUser() {
         TodoSubItemRequest request = new TodoSubItemRequest();
         request.setTitle("Sub item");
 
-        when(todoRepository.existsByIdAndDeletedAtIsNull(99L)).thenReturn(false);
+        when(todoRepository.existsByIdAndUserIdAndDeletedAtIsNull(99L, USER_ID)).thenReturn(false);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
                 () -> todoSubItemService.create(99L, request));
@@ -87,7 +98,7 @@ class TodoSubItemServiceTest {
     }
 
     /**
-     * 更新子任务时应校验归属关系并持久化变更。
+     * 更新子任务时应先校验父任务归属，再持久化变更。
      */
     @Test
     void updateShouldPersistChecklistChanges() {
@@ -97,7 +108,7 @@ class TodoSubItemServiceTest {
         request.setSortOrder(3);
 
         TodoSubItem existing = createSubItem(5L, 1L, "Old", "DONE", 0);
-        when(todoRepository.existsByIdAndDeletedAtIsNull(1L)).thenReturn(true);
+        when(todoRepository.existsByIdAndUserIdAndDeletedAtIsNull(1L, USER_ID)).thenReturn(true);
         when(todoSubItemRepository.findByIdAndTodoId(5L, 1L)).thenReturn(Optional.of(existing));
         when(todoSubItemRepository.save(any(TodoSubItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -106,30 +117,30 @@ class TodoSubItemServiceTest {
         assertEquals("Review API contract", response.getTitle());
         assertEquals("PENDING", response.getStatus());
         assertEquals(3, response.getSortOrder());
-        verify(redisTemplate).delete(TodoCacheKeys.todoItem(1L));
+        verify(redisTemplate).delete(TodoCacheKeys.todoItem(USER_ID, 1L));
     }
 
     /**
-     * 删除子任务时应执行目标记录删除。
+     * 删除子任务时应执行目标记录删除并驱逐带 userId 的父任务缓存。
      */
     @Test
     void deleteShouldRemoveSubItem() {
         TodoSubItem existing = createSubItem(6L, 2L, "Delete me", "PENDING", 1);
-        when(todoRepository.existsByIdAndDeletedAtIsNull(2L)).thenReturn(true);
+        when(todoRepository.existsByIdAndUserIdAndDeletedAtIsNull(2L, USER_ID)).thenReturn(true);
         when(todoSubItemRepository.findByIdAndTodoId(6L, 2L)).thenReturn(Optional.of(existing));
 
         todoSubItemService.delete(2L, 6L);
 
         verify(todoSubItemRepository).delete(existing);
-        verify(redisTemplate).delete(TodoCacheKeys.todoItem(2L));
+        verify(redisTemplate).delete(TodoCacheKeys.todoItem(USER_ID, 2L));
     }
 
     /**
-     * 摘要接口应返回总数、完成数与进度百分比。
+     * 摘要接口应在当前用户拥有父任务时返回总数、完成数与进度百分比。
      */
     @Test
     void getSummaryShouldReturnProgressAggregate() {
-        when(todoRepository.existsByIdAndDeletedAtIsNull(3L)).thenReturn(true);
+        when(todoRepository.existsByIdAndUserIdAndDeletedAtIsNull(3L, USER_ID)).thenReturn(true);
         when(todoSubItemRepository.findAllByTodoIdOrderBySortOrderAscIdAsc(3L)).thenReturn(List.of(
                 createSubItem(1L, 3L, "A", "DONE", 0),
                 createSubItem(2L, 3L, "B", "PENDING", 1),

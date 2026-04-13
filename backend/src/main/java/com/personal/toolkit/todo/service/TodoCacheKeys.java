@@ -11,10 +11,11 @@ public final class TodoCacheKeys {
     /**
      * 生成单个待办事项详情缓存键。
      *
+     * @param userId 待办事项所属用户主键
      * @param todoId 待办事项主键
      * @return Redis 中使用的详情缓存键
      */
-    public static String todoItem(Long todoId) {
-        return "todo:item:" + todoId;
+    public static String todoItem(Long userId, Long todoId) {
+        return "todo:item:user:" + userId + ":" + todoId;
     }
 }

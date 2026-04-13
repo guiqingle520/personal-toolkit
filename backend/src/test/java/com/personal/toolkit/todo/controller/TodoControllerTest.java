@@ -1,11 +1,20 @@
 package com.personal.toolkit.todo.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.personal.toolkit.auth.config.SecurityConfig;
+import com.personal.toolkit.auth.security.AppUserDetailsService;
+import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
+import com.personal.toolkit.auth.security.JwtTokenService;
+import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoBatchRequest;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.todo.service.TodoService;
@@ -18,13 +27,14 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -37,10 +47,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 验证 TodoController 暴露的第二阶段接口契约与异常返回结构。
+ * 验证 TodoController 在开启 Spring Security 后的接口契约、认证要求与异常返回结构。
  */
 @WebMvcTest(TodoController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({
+        GlobalExceptionHandler.class,
+        SecurityConfig.class,
+        JwtAuthenticationFilter.class,
+        RestAuthenticationEntryPoint.class
+})
+@WithMockUser(username = "alice")
 class TodoControllerTest {
 
     @Autowired
@@ -51,6 +67,24 @@ class TodoControllerTest {
 
     @MockBean
     private TodoService todoService;
+
+    @MockBean
+    private JwtTokenService jwtTokenService;
+
+    @MockBean
+    private AppUserDetailsService appUserDetailsService;
+
+    /**
+     * 未认证访问 Todo 资源时应返回统一 401 错误响应，避免暴露默认登录页。
+     */
+    @Test
+    @WithAnonymousUser
+    void findAllShouldRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/todos"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Authentication required"));
+    }
 
     /**
      * 查询分类标签候选项时应返回成功响应体。
@@ -66,6 +100,64 @@ class TodoControllerTest {
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.data.categories[0]").value("Work"))
                 .andExpect(jsonPath("$.data.tags[0]").value("urgent"));
+    }
+
+    /**
+     * 统计概览接口应返回统一响应壳与概览卡片字段。
+     */
+    @Test
+    void getStatsOverviewShouldReturnOverviewPayload() throws Exception {
+        when(todoService.getStatsOverview()).thenReturn(new TodoStatsOverviewResponse(2, 7, 3, 11));
+
+        mockMvc.perform(get("/api/todos/stats/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Todo stats overview fetched successfully"))
+                .andExpect(jsonPath("$.data.todayCompleted").value(2))
+                .andExpect(jsonPath("$.data.weekCompleted").value(7))
+                .andExpect(jsonPath("$.data.overdueCount").value(3))
+                .andExpect(jsonPath("$.data.activeCount").value(11));
+    }
+
+    /**
+     * 分类统计接口应返回分类聚合契约。
+     */
+    @Test
+    void getStatsByCategoryShouldReturnCategoryPayload() throws Exception {
+        when(todoService.getCategoryStats()).thenReturn(List.of(
+                new TodoStatsCategoryItemResponse("Work", 4, 2),
+                new TodoStatsCategoryItemResponse("__UNCLASSIFIED__", 3, 1)
+        ));
+
+        mockMvc.perform(get("/api/todos/stats/by-category"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Todo stats by category fetched successfully"))
+                .andExpect(jsonPath("$.data[0].category").value("Work"))
+                .andExpect(jsonPath("$.data[0].activeCount").value(4))
+                .andExpect(jsonPath("$.data[0].completedCount").value(2));
+    }
+
+    /**
+     * 趋势统计接口应返回时间范围与每日完成数量列表。
+     */
+    @Test
+    void getStatsTrendShouldReturnTrendPayload() throws Exception {
+        when(todoService.getStatsTrend("7d")).thenReturn(new TodoStatsTrendResponse(
+                "7d",
+                List.of(
+                        new TodoStatsTrendItemResponse("2026-04-04", 1),
+                        new TodoStatsTrendItemResponse("2026-04-05", 0)
+                )
+        ));
+
+        mockMvc.perform(get("/api/todos/stats/trend").param("range", "7d"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Todo stats trend fetched successfully"))
+                .andExpect(jsonPath("$.data.range").value("7d"))
+                .andExpect(jsonPath("$.data.items[0].date").value("2026-04-04"))
+                .andExpect(jsonPath("$.data.items[0].completedCount").value(1));
     }
 
     /**

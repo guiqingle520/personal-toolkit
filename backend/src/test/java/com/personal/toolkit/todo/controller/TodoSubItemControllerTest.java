@@ -1,6 +1,11 @@
 package com.personal.toolkit.todo.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.personal.toolkit.auth.config.SecurityConfig;
+import com.personal.toolkit.auth.security.AppUserDetailsService;
+import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
+import com.personal.toolkit.auth.security.JwtTokenService;
+import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import com.personal.toolkit.todo.dto.TodoSubItemRequest;
 import com.personal.toolkit.todo.dto.TodoSubItemResponse;
@@ -12,6 +17,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -29,10 +36,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 验证 TodoSubItemController 暴露的嵌套 checklist 接口契约与校验行为。
+ * 验证 TodoSubItemController 在开启认证后暴露的嵌套 checklist 接口契约与校验行为。
  */
 @WebMvcTest(TodoSubItemController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({
+        GlobalExceptionHandler.class,
+        SecurityConfig.class,
+        JwtAuthenticationFilter.class,
+        RestAuthenticationEntryPoint.class
+})
+@WithMockUser(username = "alice")
 class TodoSubItemControllerTest {
 
     @Autowired
@@ -43,6 +56,24 @@ class TodoSubItemControllerTest {
 
     @MockBean
     private TodoSubItemService todoSubItemService;
+
+    @MockBean
+    private JwtTokenService jwtTokenService;
+
+    @MockBean
+    private AppUserDetailsService appUserDetailsService;
+
+    /**
+     * 未认证访问 checklist 接口时应返回统一 401 错误响应。
+     */
+    @Test
+    @WithAnonymousUser
+    void findByTodoIdShouldRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/todos/1/sub-items"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Authentication required"));
+    }
 
     /**
      * 子任务列表接口应返回统一成功响应和数组数据。

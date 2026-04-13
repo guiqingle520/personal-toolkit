@@ -2,8 +2,8 @@
 
 个人工具箱项目，包含：
 
-- `backend`：Spring Boot 3 + Oracle + Redis 的 Todo API
-- `frontend`：Vue 3 + TypeScript + Vite 的 Todo 页面
+- `backend`：Spring Boot 3 + Oracle + Redis 的 Todo API，现已接入 JWT 登录鉴权
+- `frontend`：Vue 3 + TypeScript + Vite 的 Todo 页面，现已接入登录 / 注册 / 退出
 
 ## 目录结构
 
@@ -49,8 +49,124 @@ personal-toolkit
 对应配置文件：
 
 - `backend/src/main/resources/application-dev.yml`
+- `backend/src/main/resources/application.yml`
+
+### JWT 配置说明
+
+当前后端通过以下配置签发和校验 JWT：
+
+- `APP_AUTH_JWT_SECRET`：JWT 对称签名密钥，**推荐使用 Base64 编码后的 32 字节及以上随机密钥**
+- `APP_AUTH_JWT_ISSUER`：JWT 签发方，默认值为 `personal-toolkit-backend`
+- `APP_AUTH_JWT_EXPIRATION`：JWT 过期时间，默认值为 `PT12H`
+
+项目已内置一个仅用于本地开发的 Base64 默认密钥；在测试、联调、生产环境中，**强烈建议通过环境变量覆盖**。
+
+如果 `APP_AUTH_JWT_SECRET` 被显式配置为空字符串，当前实现也会回退到默认开发密钥，以避免本地启动失败；但**生产环境不要依赖这个兜底行为**，应始终显式提供你自己的安全密钥。
+
+PowerShell 示例：
+
+```powershell
+$env:APP_AUTH_JWT_SECRET = "your-base64-secret"
+$env:APP_AUTH_JWT_ISSUER = "personal-toolkit-backend"
+$env:APP_AUTH_JWT_EXPIRATION = "PT12H"
+```
+
+如果你需要生成新的 Base64 密钥，可以使用下面这条 PowerShell 命令：
+
+```powershell
+[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+```
 
 ## 启动方式
+
+### 数据库初始化与旧数据迁移
+
+当前版本已从单用户 Todo 升级为“账号 + Todo 数据归属”模型，数据库初始化与迁移建议按以下顺序执行：
+
+1. `backend/sql/create_app_user.sql`
+2. `backend/sql/create_todo_item.sql`
+3. `backend/sql/alter_todo_item_add_user_id_phase1.sql`（仅老库升级时需要）
+4. `backend/sql/alter_todo_item_add_user_id_phase2.sql`（仅老库升级时需要）
+
+其中：
+
+- `create_app_user.sql`：创建登录用户表与序列
+- `create_todo_item.sql`：创建 Todo 主表
+- `alter_todo_item_add_user_id_phase1.sql`：先给历史 Todo 表增加可空 `user_id` 字段
+- `alter_todo_item_add_user_id_phase2.sql`：在旧数据回填完成后，补齐 `NOT NULL`、外键和索引
+
+> 如果是全新建库，`create_todo_item.sql` 已经直接包含 `user_id`、外键和索引，不需要再执行这两个升级脚本。
+
+### 旧数据归属回填说明
+
+如果数据库里已经存在历史 Todo 数据，需要先确定一个“接管旧数据”的账号。推荐做法是：**先通过前端注册或调用 `/api/auth/register` 创建目标账号，再执行 SQL 回填**。
+
+下面给出一套推荐 SQL 流程，假设你要把旧数据统一归到账号 `legacy_owner`。
+
+#### 第一步：确认目标账号已经存在
+
+```sql
+SELECT id, username, email
+FROM app_user
+WHERE username = 'legacy_owner';
+```
+
+如果查不到记录，请先注册这个账号，再继续后续步骤。
+
+#### 第二步：检查当前仍未绑定账号的 Todo 数量
+
+```sql
+SELECT COUNT(*) AS unbound_todo_count
+FROM todo_item
+WHERE user_id IS NULL;
+```
+
+#### 第三步：先执行 Phase 1 扩字段脚本
+
+```sql
+@backend/sql/alter_todo_item_add_user_id_phase1.sql
+```
+
+如果你使用的工具不支持 `@`，也可以直接打开并执行脚本内容。
+
+#### 第四步：执行旧数据回填
+
+```sql
+UPDATE todo_item
+SET user_id = (
+    SELECT id
+    FROM app_user
+    WHERE username = 'legacy_owner'
+)
+WHERE user_id IS NULL;
+
+COMMIT;
+```
+
+#### 第五步：校验回填结果
+
+```sql
+SELECT COUNT(*) AS remaining_unbound_count
+FROM todo_item
+WHERE user_id IS NULL;
+
+SELECT user_id, COUNT(*) AS todo_count
+FROM todo_item
+GROUP BY user_id
+ORDER BY user_id;
+```
+
+#### 第六步：执行 Phase 2 收口脚本
+
+当 `remaining_unbound_count = 0` 后，再执行第二阶段脚本：
+
+```sql
+-- 先将脚本里的 :legacy_user_id 替换成真实用户主键，
+-- 或在 SQL 工具中绑定变量后再执行
+@backend/sql/alter_todo_item_add_user_id_phase2.sql
+```
+
+> `backend/sql/alter_todo_item_add_user_id.sql` 已保留为弃用说明文件，不建议继续直接使用。
 
 ### 方式一：直接本地启动后端
 
@@ -75,6 +191,14 @@ npm install
 npm run dev
 ```
 
+### 首次使用
+
+1. 打开前端页面 `http://localhost:5173`
+2. 先注册账号（用户名 + 邮箱 + 密码）
+3. 注册成功后前端会自动进入已登录状态
+4. 后续可使用**用户名或邮箱**配合密码登录，请求会自动携带 JWT Token，Todo 数据只会展示当前账号名下的数据
+5. 点击页面右上角的“断开连接 / Disconnect”可退出当前登录态
+
 ## 代码注释规范
 
 项目代码注释规范已统一沉淀到以下文件，请以后以该文档为唯一维护入口：
@@ -89,3 +213,38 @@ npm run dev
 - 方案文档归档要求（正式方案需归档到 `docs/`，变更需按版本迭代）
 - Java / Vue / TypeScript 的注释风格
 - 注释失真后的同步更新要求
+
+## 当前项目状态
+
+当前 Todo 模块已完成并验收通过的阶段：
+
+- Phase 3 / Sprint 3.1：子任务 / Checklist
+- Phase 3 / Sprint 3.2：重复任务 / Recurrence
+- Phase 3 / Sprint 3.3：统计面板 / Stats Panel
+- Phase 3 / Sprint 3.4：看板视图 / Static Kanban View
+
+当前系统已具备：
+
+- JWT 登录 / 注册 / 退出
+- 支持用户名或邮箱登录
+- 当前用户登录态恢复（前端本地持久化）
+- Todo 数据按账号隔离
+- Todo 基础 CRUD
+- 筛选 / 分页 / 回收站
+- Checklist / 子任务
+- 重复任务
+- 统计面板
+- 列表 / 看板视图切换
+- 中英文国际化
+
+## 文档索引
+
+- `docs/code-style.md`：代码规范与文档归档要求
+- `backend/sql/create_app_user.sql`：用户表初始化脚本
+- `backend/sql/alter_todo_item_add_user_id_phase1.sql`：Todo 账号归属迁移第一阶段脚本
+- `backend/sql/alter_todo_item_add_user_id_phase2.sql`：Todo 账号归属迁移第二阶段脚本
+- `docs/phase-3-plan-v1.md`：Phase 3 初始规划
+- `docs/phase-3-plan-v2.md`：Phase 3 中期实施版
+- `docs/phase-3-plan-v3.md`：Phase 3 收尾归档版
+- `docs/phase-4-plan-v1.md`：Phase 4 起始规划版
+- `docs/operation-manual.md`：操作手册

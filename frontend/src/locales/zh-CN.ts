@@ -8,6 +8,8 @@ const zhCN = {
     refresh: '刷新',
     activeTasks: '活动任务',
     recycleBin: '回收站',
+    listView: '列表视图',
+    kanbanView: '看板视图',
     manageCategories: '管理分类/标签',
     localeLabel: '语言',
   },
@@ -50,6 +52,9 @@ const zhCN = {
     na: '无'
   },
   status: {
+    PENDING: '待办',
+    IN_PROGRESS: '进行中',
+    DONE: '已完成',
     initiating: '正在初始化神经连接...',
     empty: '未找到任务。网格很安静。',
     markAsPending: '标记为待办',
@@ -97,6 +102,40 @@ const zhCN = {
     endTime: '结束日期',
     nextTrigger: '计划触发：{time}',
     completedAt: '完成于：{time}'
+  },
+  stats: {
+    panelTitle: '统计面板',
+    todayCompleted: '今日完成',
+    weekCompleted: '本周完成',
+    overdueCount: '逾期任务',
+    activeCount: '活动任务',
+    categoryStats: '分类统计',
+    trend7d: '7日趋势',
+    uncategorized: '未分类',
+    activeLabel: '活动：{count}',
+    completedLabel: '完成：{count}',
+    completedOnlyLabel: '完成：{count}',
+    empty: '暂无数据'
+  },
+  kanban: {
+    pendingColumn: '待办',
+    doneColumn: '已完成',
+    emptyColumn: '此列暂无任务'
+  },
+  auth: {
+    loginTitle: '系统登录',
+    registerTitle: '建立连接',
+    username: '用户名',
+    loginIdentifier: '用户名或邮箱',
+    password: '密码',
+    email: '邮箱',
+    loginBtn: '登录',
+    registerBtn: '注册',
+    noAccount: '尚未获得权限？',
+    registerLink: '申请账号',
+    hasAccount: '已有通行证？',
+    loginLink: '立即登录',
+    logout: '断开连接'
   }
 }
 

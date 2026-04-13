@@ -77,3 +77,26 @@ export interface TodoSubItemSummary {
 export interface TodoSubItemDraft {
   title: string
 }
+
+export interface TodoStatsOverview {
+  todayCompleted: number
+  weekCompleted: number
+  overdueCount: number
+  activeCount: number
+}
+
+export interface TodoStatsCategoryItem {
+  category: string
+  activeCount: number
+  completedCount: number
+}
+
+export interface TodoStatsTrendItem {
+  date: string
+  completedCount: number
+}
+
+export interface TodoStatsTrend {
+  range: string
+  items: TodoStatsTrendItem[]
+}

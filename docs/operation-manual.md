@@ -23,13 +23,34 @@
 
 ### 核心特性
 
+- ✅ JWT 登录 / 注册 / 退出
+- ✅ Todo 数据按账号隔离
 - ✅ 完整的 CRUD 操作（创建、查询、更新、删除）
 - ✅ 任务状态管理（待处理/已完成）
+- ✅ 分页、筛选与回收站
+- ✅ Checklist / 子任务管理
+- ✅ 重复任务（完成后生成下一条实例）
+- ✅ 统计面板（概览 / 分类 / 最近 7 天趋势）
+- ✅ 列表视图 / 静态看板视图切换
 - ✅ Redis 缓存加速查询性能
 - ✅ 统一响应格式和异常处理
 - ✅ 赛博朋克风格的现代化 UI
 - ✅ Docker 容器化部署支持
 - ✅ TypeScript 类型安全保障
+
+### 当前阶段状态
+
+当前项目已完成并验收通过：
+
+- Phase 3 / Sprint 3.1：子任务 / Checklist
+- Phase 3 / Sprint 3.2：重复任务 / Recurrence
+- Phase 3 / Sprint 3.3：统计面板 / Stats Panel
+- Phase 3 / Sprint 3.4：看板视图 / Static Kanban View
+
+建议配套阅读：
+
+- `docs/phase-3-plan-v3.md`
+- `docs/phase-4-plan-v1.md`
 
 ### 适用场景
 
@@ -65,9 +86,11 @@
 |------|------|------|
 | Java | 17 | 编程语言 |
 | Spring Boot | 3.3.5 | Web 框架 |
+| Spring Security | - | JWT 鉴权 |
 | Spring Data JPA | - | ORM 数据访问 |
 | Oracle JDBC | ojdbc11 | 数据库驱动 |
 | Spring Data Redis | - | 缓存集成 |
+| JJWT | 0.12.6 | JWT 签发与校验 |
 | Maven | - | 依赖管理和构建 |
 
 ### 前端技术栈
@@ -138,7 +161,91 @@
 
 #### 1. 初始化数据库
 
-连接到 Oracle 数据库，执行建表脚本：
+连接到 Oracle 数据库后，按以下顺序执行当前脚本集：
+
+1. `backend/sql/create_app_user.sql`
+2. `backend/sql/create_todo_item.sql`
+3. `backend/sql/alter_todo_item_add_user_id_phase1.sql`（仅老库升级时需要）
+4. `backend/sql/alter_todo_item_add_user_id_phase2.sql`（仅老库升级时需要）
+
+其中：
+
+- `create_app_user.sql` 用于创建登录用户表
+- `create_todo_item.sql` 用于创建 Todo 主表
+- `alter_todo_item_add_user_id_phase1.sql` 用于给历史 Todo 增加可空账号归属字段
+- `alter_todo_item_add_user_id_phase2.sql` 用于在回填完成后补齐约束与索引
+
+> 对于全新初始化数据库，不需要再执行 Phase 1 / Phase 2，因为 `create_todo_item.sql` 已经直接带了 `user_id`、外键与索引。
+
+#### 1.1 旧数据绑定到指定账号
+
+如果库里已经存在登录改造前的旧 Todo，需要先把这些旧数据统一绑定到一个指定账号。
+
+推荐流程如下：
+
+1. 先启动前后端，注册一个用于接管旧数据的账号，例如：`legacy_owner`
+2. 回到 Oracle，执行以下 SQL 查询该账号主键：
+
+```sql
+SELECT id, username, email
+FROM app_user
+WHERE username = 'legacy_owner';
+```
+
+3. 检查待回填的旧数据量：
+
+```sql
+SELECT COUNT(*) AS unbound_todo_count
+FROM todo_item
+WHERE user_id IS NULL;
+```
+
+4. 先执行第一阶段扩字段脚本：
+
+```sql
+@backend/sql/alter_todo_item_add_user_id_phase1.sql
+```
+
+5. 执行回填：
+
+```sql
+UPDATE todo_item
+SET user_id = (
+    SELECT id
+    FROM app_user
+    WHERE username = 'legacy_owner'
+)
+WHERE user_id IS NULL;
+
+COMMIT;
+```
+
+6. 执行回填后的校验：
+
+```sql
+SELECT COUNT(*) AS remaining_unbound_count
+FROM todo_item
+WHERE user_id IS NULL;
+
+SELECT user_id, COUNT(*) AS todo_count
+FROM todo_item
+GROUP BY user_id
+ORDER BY user_id;
+```
+
+当 `remaining_unbound_count = 0` 后，说明旧数据已经全部完成绑定。
+
+7. 执行第二阶段收口脚本：
+
+```sql
+-- 先将 :legacy_user_id 替换成真实用户主键，
+-- 或在 SQL 工具中显式绑定该变量后再执行
+@backend/sql/alter_todo_item_add_user_id_phase2.sql
+```
+
+> `alter_todo_item_add_user_id.sql` 已改为弃用说明文件，仅用于兼容历史引用，不建议继续使用。
+
+以下示例仅展示 `create_todo_item.sql` 的基础建表片段：
 
 ```sql
 -- 文件位置: backend/sql/create_todo_item.sql
@@ -194,7 +301,22 @@ npm run dev
 
 前端服务运行在: `http://localhost:5173`
 
-#### 4. 访问应用
+#### 4. 注册与登录
+
+首次访问前端页面后，会先进入登录 / 注册页。
+
+**首次使用建议顺序：**
+
+1. 打开 `http://localhost:5173`
+2. 点击注册，填写：
+   - 用户名
+   - 邮箱
+   - 密码（8~100 位）
+3. 注册成功后，前端会自动进入已登录态
+4. 后续登录时可使用**用户名或邮箱**配合密码，所有 Todo 请求会自动带上 JWT Token
+5. 顶部工具栏可执行退出操作，退出后将清除本地登录态
+
+#### 5. 访问应用
 
 打开浏览器访问: `http://localhost:5173`
 
@@ -251,10 +373,40 @@ docker compose down -v
 
 ### 1. 任务列表展示
 
-- **自动加载**: 页面打开时自动从后端加载所有待办事项
-- **排序规则**: 按创建时间倒序排列（最新的在前）
-- **统计信息**: 显示总任务数和待处理任务数
-- **刷新功能**: 点击 "Refresh" 按钮手动同步最新数据
+- **自动加载**: 登录成功后自动从后端加载当前账号下的待办事项
+- **排序规则**: 默认按创建时间倒序排列，可按筛选条件分页查询
+- **统计信息**: 显示总任务数、待处理任务数，并在活动任务页展示统计面板
+- **刷新功能**: 点击“刷新 / Refresh”按钮手动同步最新数据
+
+### 1.5 登录态与账号隔离
+
+- Todo、统计面板、回收站、Checklist 都只返回当前账号自己的数据
+- 前端会在本地保存 JWT，用于刷新页面后恢复登录态
+- 如果后端返回 `401 Unauthorized`，前端会自动清理本地登录态并回到登录页
+- 当前版本的退出是无状态退出：前端清除本地 Token，服务端不做已签发 Token 撤销
+
+### 1.1 Checklist / 子任务
+
+- 支持在主任务下展开 checklist
+- 支持子任务新增、更新、删除、状态切换
+- 支持显示 checklist 完成进度汇总
+
+### 1.2 重复任务
+
+- 支持每日 / 每周 / 每月重复任务
+- 当前执行模型为：完成当前任务后生成下一条实例
+- 支持重复间隔、结束时间、完成时间展示
+
+### 1.3 统计面板
+
+- 仅在活动任务页展示
+- 支持概览统计、分类统计、最近 7 天完成趋势
+
+### 1.4 看板视图
+
+- 活动任务页支持列表视图 / 静态看板视图切换
+- 当前看板首版按“待办 / 已完成”静态分列
+- 当前不支持拖拽改状态
 
 ### 2. 创建任务
 
@@ -316,6 +468,23 @@ docker compose down -v
 
 ## API 接口文档
 
+### 认证接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/auth/register` | 注册账号并返回 JWT 与当前用户信息 |
+| POST | `/api/auth/login` | 支持用户名或邮箱登录，并返回 JWT 与当前用户信息 |
+| GET | `/api/auth/me` | 获取当前登录用户信息 |
+| POST | `/api/auth/logout` | 退出当前登录态（前端清理 Token） |
+
+### Todo 接口认证要求
+
+除 `/api/auth/register`、`/api/auth/login` 与健康检查外，其余接口都需要在请求头中携带：
+
+```http
+Authorization: Bearer <jwt-token>
+```
+
 ### 基础信息
 
 - **Base URL**: `http://localhost:8080/api`
@@ -350,7 +519,7 @@ docker compose down -v
 
 ### 接口列表
 
-#### 1. 查询所有待办事项
+#### 1. 分页查询待办事项
 
 **请求**
 ```http
@@ -362,15 +531,26 @@ GET /api/todos
 {
   "success": true,
   "message": "Todo list fetched successfully",
-  "data": [
-    {
-      "id": 1,
-      "title": "学习 Spring Boot",
-      "status": "PENDING",
-      "createTime": "2024-01-01T10:00:00",
-      "updateTime": "2024-01-01T10:00:00"
-    }
-  ],
+  "data": {
+    "content": [
+      {
+        "id": 1,
+        "title": "学习 Spring Boot",
+        "status": "PENDING",
+        "priority": 3,
+        "category": "Work",
+        "tags": "backend",
+        "createTime": "2024-01-01T10:00:00",
+        "updateTime": "2024-01-01T10:00:00"
+      }
+    ],
+    "totalElements": 1,
+    "totalPages": 1,
+    "page": 0,
+    "size": 10,
+    "first": true,
+    "last": true
+  },
   "timestamp": "2024-01-01T12:00:00+08:00"
 }
 ```
@@ -382,7 +562,52 @@ curl http://localhost:8080/api/todos
 
 ---
 
-#### 2. 查询单个待办事项
+#### 2. 查询待办筛选候选项
+
+**请求**
+```http
+GET /api/todos/options
+```
+
+**响应** (200 OK)
+```json
+{
+  "success": true,
+  "message": "Todo options fetched successfully",
+  "data": {
+    "categories": ["Work", "Personal"],
+    "tags": ["backend", "urgent"]
+  },
+  "timestamp": "2024-01-01T12:00:00+08:00"
+}
+```
+
+---
+
+#### 3. 查询统计概览
+
+**请求**
+```http
+GET /api/todos/stats/overview
+```
+
+#### 4. 查询分类统计
+
+**请求**
+```http
+GET /api/todos/stats/by-category
+```
+
+#### 5. 查询最近 7 天趋势
+
+**请求**
+```http
+GET /api/todos/stats/trend?range=7d
+```
+
+---
+
+#### 6. 查询单个待办事项
 
 **请求**
 ```http
@@ -424,7 +649,7 @@ curl http://localhost:8080/api/todos/1
 
 ---
 
-#### 3. 创建待办事项
+#### 7. 创建待办事项
 
 **请求**
 ```http
@@ -481,7 +706,7 @@ curl -X POST http://localhost:8080/api/todos \
 
 ---
 
-#### 4. 更新待办事项
+#### 8. 更新待办事项
 
 **请求**
 ```http
@@ -525,7 +750,7 @@ curl -X PUT http://localhost:8080/api/todos/2 \
 
 ---
 
-#### 5. 删除待办事项
+#### 9. 删除待办事项
 
 **请求**
 ```http
@@ -561,6 +786,43 @@ curl -X DELETE http://localhost:8080/api/todos/2
 
 ---
 
+#### 10. 查询指定主任务下的 Checklist
+
+**请求**
+```http
+GET /api/todos/{todoId}/sub-items
+```
+
+#### 11. 创建 Checklist 子任务
+
+**请求**
+```http
+POST /api/todos/{todoId}/sub-items
+```
+
+#### 12. 更新 Checklist 子任务
+
+**请求**
+```http
+PUT /api/todos/{todoId}/sub-items/{subItemId}
+```
+
+#### 13. 删除 Checklist 子任务
+
+**请求**
+```http
+DELETE /api/todos/{todoId}/sub-items/{subItemId}
+```
+
+#### 14. 查询 Checklist 汇总
+
+**请求**
+```http
+GET /api/todos/{todoId}/sub-items/summary
+```
+
+---
+
 ## 数据库设计
 
 ### 表结构：todo_item
@@ -570,14 +832,48 @@ curl -X DELETE http://localhost:8080/api/todos/2
 | id | NUMBER(19) | PRIMARY KEY | 主键，由序列生成 |
 | title | VARCHAR2(200 CHAR) | NOT NULL | 待办事项标题 |
 | status | VARCHAR2(32 CHAR) | NOT NULL, DEFAULT 'PENDING' | 状态：PENDING/DONE |
+| priority | NUMBER(2) | NOT NULL, DEFAULT 3 | 优先级，1~5 |
+| due_date | TIMESTAMP | NULL | 截止时间 |
+| category | VARCHAR2(100 CHAR) | NULL | 分类 |
+| tags | VARCHAR2(500 CHAR) | NULL | 标签，逗号分隔 |
+| deleted_at | TIMESTAMP | NULL | 软删除时间 |
+| recurrence_type | VARCHAR2(32 CHAR) | NOT NULL, DEFAULT 'NONE' | 重复类型 |
+| recurrence_interval | NUMBER(4) | NOT NULL, DEFAULT 1 | 重复间隔 |
+| recurrence_end_time | TIMESTAMP | NULL | 重复截止时间 |
+| next_trigger_time | TIMESTAMP | NULL | 重复任务计划触发时间 |
+| completed_at | TIMESTAMP | NULL | 完成时间 |
 | create_time | TIMESTAMP | NOT NULL, DEFAULT SYSTIMESTAMP | 创建时间 |
 | update_time | TIMESTAMP | NOT NULL, DEFAULT SYSTIMESTAMP | 最后更新时间 |
+
+### 表结构：todo_sub_item
+
+| 字段名 | 数据类型 | 约束 | 说明 |
+|--------|---------|------|------|
+| id | NUMBER(19) | PRIMARY KEY | 子任务主键 |
+| todo_id | NUMBER(19) | NOT NULL | 所属主任务主键 |
+| title | VARCHAR2(200) | NOT NULL | 子任务标题 |
+| status | VARCHAR2(32) | NOT NULL, DEFAULT 'PENDING' | 子任务状态 |
+| sort_order | NUMBER(10) | NOT NULL, DEFAULT 0 | 排序序号 |
+| create_time | TIMESTAMP | NOT NULL, DEFAULT SYSTIMESTAMP | 创建时间 |
+| update_time | TIMESTAMP | NOT NULL, DEFAULT SYSTIMESTAMP | 更新时间 |
+
+### 当前数据库脚本
+
+- `backend/sql/create_todo_item.sql`
+- `backend/sql/alter_todo_item_phase1.sql`
+- `backend/sql/alter_todo_item_phase2.sql`
+- `backend/sql/alter_todo_item_phase3_recurrence.sql`
+- `backend/sql/create_todo_sub_item.sql`
 
 ### 约束条件
 
 1. **主键约束**: `PRIMARY KEY (id)`
 2. **非空约束**: `title`, `status`, `create_time`, `update_time` 不能为空
 3. **检查约束**: `CHECK (status IN ('PENDING', 'DONE'))`
+4. **优先级约束**: `priority BETWEEN 1 AND 5`
+5. **重复任务约束**:
+   - `recurrence_type IN ('NONE', 'DAILY', 'WEEKLY', 'MONTHLY')`
+   - `recurrence_interval >= 1`
 
 ### 序列：todo_item_seq
 
@@ -658,7 +954,7 @@ CREATE INDEX idx_todo_create_time ON todo_item(create_time DESC);
 
 ### 关键代码位置
 
-[TodoService.java](file:///E:/personalDev/mytodo/personal-toolkit/backend/src/main/java/com/personal/toolkit/todo/service/TodoService.java)
+- `backend/src/main/java/com/personal/toolkit/todo/service/TodoService.java`
 
 ```java
 // 事务提交后更新缓存
@@ -830,7 +1126,7 @@ curl http://localhost:8080/actuator/health
 
 ### 代码注释规范
 
-详细规范请参考: [docs/code-style.md](file:///E:/personalDev/mytodo/personal-toolkit/docs/code-style.md)
+详细规范请参考: `docs/code-style.md`
 
 #### 核心原则
 
@@ -981,7 +1277,12 @@ export default defineConfig({
 
 **解决方案**:
 1. 连接到 Oracle 数据库
-2. 执行 `backend/sql/create_todo_item.sql`
+2. 按顺序执行以下脚本：
+   - `backend/sql/create_todo_item.sql`
+   - `backend/sql/alter_todo_item_phase1.sql`
+   - `backend/sql/alter_todo_item_phase2.sql`
+   - `backend/sql/alter_todo_item_phase3_recurrence.sql`
+   - `backend/sql/create_todo_sub_item.sql`
 3. 验证表和序列是否创建成功:
    ```sql
    SELECT table_name FROM user_tables WHERE table_name = 'TODO_ITEM';
@@ -1131,6 +1432,8 @@ public ResponseEntity<ApiResponse<Page<TodoItem>>> findAll(
 - JWT Token 生成和验证
 - 拦截器保护受保护的 API
 - 前端存储 Token（localStorage/HttpOnly Cookie）
+
+> 当前项目对 `APP_AUTH_JWT_SECRET` 做了开发期兜底：如果它被显式配置为空字符串，系统会回退到默认开发密钥以避免本地启动失败；但**生产环境不要依赖这个行为**，应始终显式配置你自己的安全密钥。
 
 ---
 
@@ -1387,10 +1690,9 @@ redis-cli -h 192.168.240.128 -p 6379 -a glaway123 # 连接 Redis
 
 - 📧 Email: [your-email@example.com]
 - 🐛 Issues: [GitHub Issues]
-- 📖 文档: [docs/code-style.md](file:///E:/personalDev/mytodo/personal-toolkit/docs/code-style.md)
+- 📖 文档: `docs/code-style.md`
 
 ---
 
 **最后更新**: 2024-01-01  
 **版本**: v0.0.1-SNAPSHOT
-

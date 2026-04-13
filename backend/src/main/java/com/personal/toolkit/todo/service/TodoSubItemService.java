@@ -1,5 +1,6 @@
 package com.personal.toolkit.todo.service;
 
+import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.todo.dto.TodoSubItemRequest;
 import com.personal.toolkit.todo.dto.TodoSubItemResponse;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
@@ -30,13 +31,16 @@ public class TodoSubItemService {
     private final TodoSubItemRepository todoSubItemRepository;
     private final TodoRepository todoRepository;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final CurrentUserProvider currentUserProvider;
 
     public TodoSubItemService(TodoSubItemRepository todoSubItemRepository,
                               TodoRepository todoRepository,
-                              RedisTemplate<String, Object> redisTemplate) {
+                              RedisTemplate<String, Object> redisTemplate,
+                              CurrentUserProvider currentUserProvider) {
         this.todoSubItemRepository = todoSubItemRepository;
         this.todoRepository = todoRepository;
         this.redisTemplate = redisTemplate;
+        this.currentUserProvider = currentUserProvider;
     }
 
     /**
@@ -126,7 +130,8 @@ public class TodoSubItemService {
      * @param todoId 主任务主键
      */
     public void validateParentTodoExists(Long todoId) {
-        if (!todoRepository.existsByIdAndDeletedAtIsNull(todoId)) {
+        Long userId = currentUserProvider.getCurrentUserId();
+        if (!todoRepository.existsByIdAndUserIdAndDeletedAtIsNull(todoId, userId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Todo item not found: " + todoId);
         }
     }
@@ -242,6 +247,6 @@ public class TodoSubItemService {
      * @return Redis 中使用的父任务缓存键
      */
     private String todoItemCacheKey(Long todoId) {
-        return TodoCacheKeys.todoItem(todoId);
+        return TodoCacheKeys.todoItem(currentUserProvider.getCurrentUserId(), todoId);
     }
 }

@@ -1,12 +1,19 @@
 package com.personal.toolkit.todo.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.personal.toolkit.auth.entity.AppUser;
+import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.todo.dto.TodoQueryRequest;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
+import com.personal.toolkit.auth.repository.AppUserRepository;
 import com.personal.toolkit.todo.repository.TodoRepository;
 import com.personal.toolkit.todo.repository.TodoSubItemRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -26,7 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Comparator;
@@ -46,20 +56,28 @@ public class TodoService {
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
     private static final Set<String> ALLOWED_STATUSES = Set.of("PENDING", "DONE");
     private static final Set<String> ALLOWED_RECURRENCE_TYPES = Set.of("NONE", "DAILY", "WEEKLY", "MONTHLY");
+    private static final String SUPPORTED_TREND_RANGE = "7d";
+    private static final String UNCLASSIFIED_CATEGORY_KEY = "__UNCLASSIFIED__";
 
     private final TodoRepository todoRepository;
     private final TodoSubItemRepository todoSubItemRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final CurrentUserProvider currentUserProvider;
+    private final AppUserRepository appUserRepository;
 
     public TodoService(TodoRepository todoRepository,
                        TodoSubItemRepository todoSubItemRepository,
                        RedisTemplate<String, Object> redisTemplate,
-                       ObjectMapper objectMapper) {
+                       ObjectMapper objectMapper,
+                       CurrentUserProvider currentUserProvider,
+                       AppUserRepository appUserRepository) {
         this.todoRepository = todoRepository;
         this.todoSubItemRepository = todoSubItemRepository;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.currentUserProvider = currentUserProvider;
+        this.appUserRepository = appUserRepository;
     }
 
     /**
@@ -74,7 +92,7 @@ public class TodoService {
     @Transactional(readOnly = true)
     public PageResponse<TodoItem> findAll(TodoQueryRequest queryRequest, int page, int size, Sort sort) {
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<TodoItem> todoPage = todoRepository.findAll(buildSpecification(queryRequest), pageable);
+        Page<TodoItem> todoPage = todoRepository.findAll(buildSpecification(queryRequest, currentUserProvider.getCurrentUserId()), pageable);
         hydrateSummaries(todoPage.getContent());
         return PageResponse.from(todoPage);
     }
@@ -86,7 +104,7 @@ public class TodoService {
      */
     @Transactional(readOnly = true)
     public TodoOptionResponse getOptions() {
-        List<TodoItem> todoItems = todoRepository.findAll(buildSpecification(defaultActiveQuery()));
+        List<TodoItem> todoItems = todoRepository.findAll(buildSpecification(defaultActiveQuery(), currentUserProvider.getCurrentUserId()));
 
         List<String> categories = todoItems.stream()
                 .map(TodoItem::getCategory)
@@ -107,6 +125,88 @@ public class TodoService {
                 .collect(Collectors.toList());
 
         return new TodoOptionResponse(categories, tags);
+    }
+
+    /**
+     * 统计概览卡片需要的今日完成、本周完成、逾期与活动任务数量。
+     *
+     * @return 统计概览数据
+     */
+    @Transactional(readOnly = true)
+    public TodoStatsOverviewResponse getStatsOverview() {
+        Long userId = currentUserProvider.getCurrentUserId();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = now.toLocalDate();
+        LocalDateTime startOfToday = today.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(23, 59, 59);
+        LocalDate startOfWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDateTime startOfWeekTime = startOfWeek.atStartOfDay();
+
+        long todayCompleted = todoRepository.countByUserIdAndDeletedAtIsNullAndCompletedAtBetween(userId, startOfToday, endOfToday);
+        long weekCompleted = todoRepository.countByUserIdAndDeletedAtIsNullAndCompletedAtBetween(userId, startOfWeekTime, endOfToday);
+        long overdueCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(userId, "DONE", now);
+        long activeCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(userId, "DONE");
+
+        return new TodoStatsOverviewResponse(todayCompleted, weekCompleted, overdueCount, activeCount);
+    }
+
+    /**
+     * 聚合分类维度的活动任务数与完成任务数，并将空分类归并为统一占位键。
+     *
+     * @return 分类统计结果列表
+     */
+    @Transactional(readOnly = true)
+    public List<TodoStatsCategoryItemResponse> getCategoryStats() {
+        Map<String, long[]> categoryBuckets = new HashMap<>();
+        List<Object[]> rows = todoRepository.summarizeByCategory(currentUserProvider.getCurrentUserId());
+        if (rows != null) {
+            rows.forEach(row -> {
+                String rawCategory = (String) row[0];
+                long activeCount = row[1] == null ? 0L : ((Number) row[1]).longValue();
+                long completedCount = row[2] == null ? 0L : ((Number) row[2]).longValue();
+                String normalizedCategory = normalizeStatsCategory(rawCategory);
+                long[] bucket = categoryBuckets.computeIfAbsent(normalizedCategory, key -> new long[]{0L, 0L});
+                bucket[0] += activeCount;
+                bucket[1] += completedCount;
+            });
+        }
+
+        return categoryBuckets.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(String::compareToIgnoreCase))
+                .map(entry -> new TodoStatsCategoryItemResponse(entry.getKey(), entry.getValue()[0], entry.getValue()[1]))
+                .toList();
+    }
+
+    /**
+     * 构建最近 7 天完成趋势，并为无数据日期补零，供前端趋势面板直接消费。
+     *
+     * @param range 时间范围，目前仅支持 7d
+     * @return 最近 7 天趋势数据
+     */
+    @Transactional(readOnly = true)
+    public TodoStatsTrendResponse getStatsTrend(String range) {
+        if (!SUPPORTED_TREND_RANGE.equalsIgnoreCase(range)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "range must be 7d");
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusDays(6);
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = today.atTime(23, 59, 59);
+        Map<LocalDate, Long> completedByDate = new HashMap<>();
+
+        todoRepository.findCompletedAtBetween(currentUserProvider.getCurrentUserId(), start, end).forEach(completedAt -> {
+            LocalDate completedDate = completedAt.toLocalDate();
+            completedByDate.put(completedDate, completedByDate.getOrDefault(completedDate, 0L) + 1L);
+        });
+
+        List<TodoStatsTrendItemResponse> items = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate currentDate = startDate.plusDays(i);
+            items.add(new TodoStatsTrendItemResponse(currentDate.toString(), completedByDate.getOrDefault(currentDate, 0L)));
+        }
+
+        return new TodoStatsTrendResponse(SUPPORTED_TREND_RANGE, items);
     }
 
     /**
@@ -142,6 +242,7 @@ public class TodoService {
     @Transactional
     public TodoItem create(TodoItemRequest request) {
         TodoItem todoItem = new TodoItem();
+        todoItem.setUser(getCurrentUserEntity());
         applyRequest(todoItem, request);
         if ("DONE".equals(todoItem.getStatus())) {
             todoItem.setCompletedAt(LocalDateTime.now());
@@ -288,7 +389,7 @@ public class TodoService {
      * @return 已存在的待办事项实体
      */
     private TodoItem getExistingTodoItem(Long id) {
-        return todoRepository.findByIdAndDeletedAtIsNull(id)
+        return todoRepository.findByIdAndUserIdAndDeletedAtIsNull(id, currentUserProvider.getCurrentUserId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Todo item not found: " + id));
     }
 
@@ -300,7 +401,8 @@ public class TodoService {
      * @return 已存在的待办事项实体
      */
     private TodoItem getExistingTodoItem(Long id, boolean includeDeleted) {
-        return (includeDeleted ? todoRepository.findById(id) : todoRepository.findByIdAndDeletedAtIsNull(id))
+        Long userId = currentUserProvider.getCurrentUserId();
+        return (includeDeleted ? todoRepository.findByIdAndUserId(id, userId) : todoRepository.findByIdAndUserIdAndDeletedAtIsNull(id, userId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Todo item not found: " + id));
     }
 
@@ -316,7 +418,7 @@ public class TodoService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ids must not be empty");
         }
 
-        List<TodoItem> todoItems = todoRepository.findAllByIdIn(ids).stream()
+        List<TodoItem> todoItems = todoRepository.findAllByUserIdAndIdIn(currentUserProvider.getCurrentUserId(), ids).stream()
                 .filter(todoItem -> includeDeleted || todoItem.getDeletedAt() == null)
                 .sorted(Comparator.comparing(TodoItem::getId))
                 .collect(Collectors.toList());
@@ -435,6 +537,7 @@ public class TodoService {
         }
 
         TodoItem nextTodo = new TodoItem();
+        nextTodo.setUser(completedTodo.getUser());
         nextTodo.setTitle(completedTodo.getTitle());
         nextTodo.setStatus("PENDING");
         nextTodo.setPriority(completedTodo.getPriority());
@@ -461,7 +564,8 @@ public class TodoService {
             return false;
         }
 
-        return todoRepository.existsByDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
+        return todoRepository.existsByUserIdAndDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
+                currentUserProvider.getCurrentUserId(),
                 nextTodo.getTitle(),
                 nextTodo.getStatus(),
                 nextTodo.getPriority(),
@@ -613,7 +717,7 @@ public class TodoService {
      * @return Redis 中使用的对象缓存键
      */
     private String todoItemCacheKey(Long id) {
-        return TodoCacheKeys.todoItem(id);
+        return TodoCacheKeys.todoItem(currentUserProvider.getCurrentUserId(), id);
     }
 
     /**
@@ -680,9 +784,10 @@ public class TodoService {
      * @param queryRequest 列表筛选条件
      * @return JPA Specification 查询条件对象
      */
-    private Specification<TodoItem> buildSpecification(TodoQueryRequest queryRequest) {
+    private Specification<TodoItem> buildSpecification(TodoQueryRequest queryRequest, Long userId) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("user").get("id"), userId));
 
             if (hasText(queryRequest.getStatus())) {
                 predicates.add(criteriaBuilder.equal(
@@ -753,6 +858,17 @@ public class TodoService {
     }
 
     /**
+     * 查询当前请求对应的用户实体，用于在创建任务时建立明确的归属关系。
+     *
+     * @return 当前登录用户实体
+     */
+    private AppUser getCurrentUserEntity() {
+        Long userId = currentUserProvider.getCurrentUserId();
+        return appUserRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required"));
+    }
+
+    /**
      * 判断字符串是否包含有效文本内容。
      *
      * @param value 待判断字符串
@@ -760,6 +876,19 @@ public class TodoService {
      */
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    /**
+     * 规范化统计面板中的分类名称，空分类统一映射为未分类占位键。
+     *
+     * @param category 原始分类值
+     * @return 规范化后的分类名称
+     */
+    private String normalizeStatsCategory(String category) {
+        if (!hasText(category)) {
+            return UNCLASSIFIED_CATEGORY_KEY;
+        }
+        return category.trim();
     }
 
     /**

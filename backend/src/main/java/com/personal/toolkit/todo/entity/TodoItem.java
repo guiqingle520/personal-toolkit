@@ -1,11 +1,16 @@
 package com.personal.toolkit.todo.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.personal.toolkit.auth.entity.AppUser;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.SequenceGenerator;
@@ -25,6 +30,11 @@ public class TodoItem {
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "todo_item_seq")
     @SequenceGenerator(name = "todo_item_seq", sequenceName = "todo_item_seq", allocationSize = 1)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
+    private AppUser user;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -87,6 +97,24 @@ public class TodoItem {
      */
     public void setId(Long id) {
         this.id = id;
+    }
+
+    /**
+     * 返回任务所属用户实体。
+     *
+     * @return 所属用户实体
+     */
+    public AppUser getUser() {
+        return user;
+    }
+
+    /**
+     * 设置任务所属用户实体。
+     *
+     * @param user 所属用户实体
+     */
+    public void setUser(AppUser user) {
+        this.user = user;
     }
 
     /**

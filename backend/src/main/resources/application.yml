@@ -44,3 +44,10 @@ logging:
   level:
     org.hibernate.SQL: debug
     org.springframework.data.redis: info
+
+app:
+  auth:
+    jwt:
+      secret: ${APP_AUTH_JWT_SECRET:uizFVR6Xqk4LzrbdSjOPDXz9r3mrI3FbTsT8z6jTexs=}
+      issuer: ${APP_AUTH_JWT_ISSUER:personal-toolkit-backend}
+      expiration: ${APP_AUTH_JWT_EXPIRATION:PT12H}

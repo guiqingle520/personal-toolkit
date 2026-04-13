@@ -6,6 +6,9 @@ import com.personal.toolkit.todo.dto.TodoBatchRequest;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
 import com.personal.toolkit.todo.dto.TodoQueryRequest;
+import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.todo.service.TodoService;
 import jakarta.validation.Valid;
@@ -71,6 +74,37 @@ public class TodoController {
     @GetMapping("/options")
     public ResponseEntity<ApiResponse<TodoOptionResponse>> getOptions() {
         return ResponseEntity.ok(ApiResponse.success("Todo options fetched successfully", todoService.getOptions()));
+    }
+
+    /**
+     * 查询统计面板顶部概览卡片所需的汇总指标。
+     *
+     * @return 统计概览统一响应体
+     */
+    @GetMapping("/stats/overview")
+    public ResponseEntity<ApiResponse<TodoStatsOverviewResponse>> getStatsOverview() {
+        return ResponseEntity.ok(ApiResponse.success("Todo stats overview fetched successfully", todoService.getStatsOverview()));
+    }
+
+    /**
+     * 查询统计面板中的分类聚合结果。
+     *
+     * @return 分类统计统一响应体
+     */
+    @GetMapping("/stats/by-category")
+    public ResponseEntity<ApiResponse<List<TodoStatsCategoryItemResponse>>> getStatsByCategory() {
+        return ResponseEntity.ok(ApiResponse.success("Todo stats by category fetched successfully", todoService.getCategoryStats()));
+    }
+
+    /**
+     * 查询统计面板中的完成趋势数据，目前仅支持最近 7 天范围。
+     *
+     * @param range 趋势范围标识
+     * @return 趋势统计统一响应体
+     */
+    @GetMapping("/stats/trend")
+    public ResponseEntity<ApiResponse<TodoStatsTrendResponse>> getStatsTrend(@RequestParam(defaultValue = "7d") String range) {
+        return ResponseEntity.ok(ApiResponse.success("Todo stats trend fetched successfully", todoService.getStatsTrend(range)));
     }
 
     /**

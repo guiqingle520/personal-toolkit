@@ -6,6 +6,7 @@ CREATE SEQUENCE todo_item_seq
 
 CREATE TABLE todo_item (
     id NUMBER(19) PRIMARY KEY,
+    user_id NUMBER(19) NOT NULL,
     title VARCHAR2(200 CHAR) NOT NULL,
     status VARCHAR2(32 CHAR) DEFAULT 'PENDING' NOT NULL,
     priority NUMBER(2) DEFAULT 3 NOT NULL,
@@ -19,7 +20,12 @@ CREATE TABLE todo_item (
     CONSTRAINT ck_todo_item_priority CHECK (priority BETWEEN 1 AND 5)
 );
 
+ALTER TABLE todo_item
+ADD CONSTRAINT fk_todo_item_user_id
+FOREIGN KEY (user_id) REFERENCES app_user(id);
+
 COMMENT ON TABLE todo_item IS '个人待办事项表';
+COMMENT ON COLUMN todo_item.user_id IS '所属用户主键';
 COMMENT ON COLUMN todo_item.title IS '待办标题';
 COMMENT ON COLUMN todo_item.status IS '待办状态';
 COMMENT ON COLUMN todo_item.priority IS '优先级，1最低，5最高';
@@ -31,6 +37,8 @@ COMMENT ON COLUMN todo_item.create_time IS '创建时间';
 COMMENT ON COLUMN todo_item.update_time IS '更新时间';
 
 CREATE INDEX idx_todo_item_status ON todo_item(status);
+CREATE INDEX idx_todo_item_user_id ON todo_item(user_id);
+CREATE INDEX idx_todo_item_user_deleted ON todo_item(user_id, deleted_at);
 CREATE INDEX idx_todo_item_priority ON todo_item(priority);
 CREATE INDEX idx_todo_item_category ON todo_item(category);
 CREATE INDEX idx_todo_item_due_date ON todo_item(due_date);

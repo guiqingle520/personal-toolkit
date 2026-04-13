@@ -4,12 +4,14 @@ import { useI18n } from 'vue-i18n'
 
 import TodoToolbar from './todo/TodoToolbar.vue'
 import TodoOptionsPanel from './todo/TodoOptionsPanel.vue'
+import TodoStatsPanel from './todo/TodoStatsPanel.vue'
 import TodoFilters from './todo/TodoFilters.vue'
 import TodoCreateForm from './todo/TodoCreateForm.vue'
 import TodoEmptyState from './todo/TodoEmptyState.vue'
 import TodoPagination from './todo/TodoPagination.vue'
 import TodoItemsList from './todo/TodoItemsList.vue'
-import type { PageData, TodoDraft, TodoFiltersModel, TodoItem, TodoOptions, TodoSubItem, TodoSubItemSummary } from './todo/types'
+import TodoKanbanView from './todo/TodoKanbanView.vue'
+import type { PageData, TodoDraft, TodoFiltersModel, TodoItem, TodoOptions, TodoSubItem, TodoSubItemSummary, TodoStatsOverview, TodoStatsCategoryItem, TodoStatsTrend, TodoStatsTrendItem } from './todo/types'
 
 function handleSelectedUpdate(id: number, selected: boolean) {
   if (selected) {
@@ -26,18 +28,8 @@ import {
   formatDateForInput,
   toDateTimeValue,
 } from '../utils/todoView'
-
-interface ApiResponse<T = void> {
-  success: boolean
-  message: string
-  data?: T
-  timestamp: string
-}
-
-interface ApiError {
-  message: string
-  validation?: Record<string, string[]>
-}
+import { fetchApi } from '../api'
+import type { ApiError } from '../api'
 
 const { t, locale } = useI18n()
 
@@ -47,6 +39,10 @@ const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
+
+const statsOverview = ref<TodoStatsOverview | null>(null)
+const statsCategories = ref<TodoStatsCategoryItem[]>([])
+const statsTrend = ref<TodoStatsTrendItem[]>([])
 
 const CATEGORY_LIST_ID = 'category-options'
 const TAG_LIST_ID = 'tag-options'
@@ -91,6 +87,7 @@ const filters = ref<TodoFiltersModel>({
 const pendingCount = computed(() => todos.value.filter(t => t.status !== 'DONE').length)
 
 const viewMode = ref<'ACTIVE' | 'RECYCLE_BIN'>('ACTIVE')
+const displayMode = ref<'LIST' | 'KANBAN'>('LIST')
 const selectedIds = ref<number[]>([])
 const options = ref<TodoOptions>({ categories: [], tags: [] })
 const showOptionsPanel = ref(false)
@@ -113,7 +110,13 @@ const isAllSelected = computed({
 watch(viewMode, () => {
   selectedIds.value = []
   filters.value.page = 0
+  if (viewMode.value !== 'ACTIVE') displayMode.value = 'LIST'
   expandedTodoIds.value = []
+  if (viewMode.value !== 'ACTIVE') {
+    statsOverview.value = null
+    statsCategories.value = []
+    statsTrend.value = []
+  }
   loadTodos()
 })
 
@@ -214,25 +217,28 @@ function handleError(error: unknown) {
   }
 }
 
-async function fetchApi<T>(url: string, options?: RequestInit): Promise<ApiResponse<T>> {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  })
-  
-  const data = await res.json().catch(() => null)
-  
-  if (!res.ok) {
-    throw new Error(JSON.stringify({
-      message: data?.message || t('feedback.httpError', { status: res.status }),
-      validation: data?.validation
-    }))
+async function loadStats() {
+  if (viewMode.value !== 'ACTIVE') {
+    statsOverview.value = null
+    statsCategories.value = []
+    statsTrend.value = []
+    return
   }
-  
-  return data as ApiResponse<T>
+
+  try {
+    const [overviewRes, categoryRes, trendRes] = await Promise.all([
+      fetchApi<TodoStatsOverview>('/api/todos/stats/overview'),
+      fetchApi<TodoStatsCategoryItem[]>('/api/todos/stats/by-category'),
+      fetchApi<TodoStatsTrend>('/api/todos/stats/trend?range=7d')
+    ])
+    statsOverview.value = overviewRes.data || null
+    statsCategories.value = categoryRes.data || []
+    statsTrend.value = trendRes.data?.items || []
+  } catch (error) {
+    statsOverview.value = null
+    statsCategories.value = []
+    statsTrend.value = []
+  }
 }
 
 async function loadTodos() {
@@ -254,6 +260,9 @@ async function loadTodos() {
     todos.value = response.data?.content || []
     hydrateChecklistSummaries(todos.value)
     reconcileSelectedIds()
+    if (viewMode.value === 'ACTIVE') {
+      loadStats()
+    }
   } catch (error) {
     handleError(error)
   } finally {
@@ -434,8 +443,8 @@ async function loadOptions() {
     if (response.data) {
       options.value = response.data
     }
-  } catch (e) {
-    // ignore
+  } catch {
+    options.value = { categories: [], tags: [] }
   }
 }
 
@@ -598,7 +607,9 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
   <section class="todo-panel">
     <div class="glass-bg"></div>
     <div class="content-wrapper">
-      <TodoToolbar 
+      <TodoToolbar
+        :displayMode="displayMode"
+        @update:displayMode="displayMode = $event" 
         :pageData="pageData" 
         :pendingCount="pendingCount"
         :loading="loading"
@@ -623,7 +634,15 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
         :show="showOptionsPanel"
       />
 
+      <TodoStatsPanel 
+        v-if="viewMode === 'ACTIVE'"
+        :overview="statsOverview"
+        :categories="statsCategories"
+        :trend="statsTrend"
+      />
+
       <TodoFilters 
+        v-if="displayMode === 'LIST'"
         :filters="filters"
         :categoryListId="CATEGORY_LIST_ID"
         :tagListId="TAG_LIST_ID"
@@ -633,6 +652,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
       />
 
       <TodoCreateForm 
+        v-if="displayMode === 'LIST'"
         :newTodo="newTodo"
         :submitting="submitting"
         :categoryListId="CATEGORY_LIST_ID"
@@ -655,7 +675,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
         :isEmpty="todos.length === 0"
       />
 
-      <div class="batch-actions-bar" v-show="todos.length > 0">
+      <div class="batch-actions-bar" v-show="todos.length > 0 && displayMode === 'LIST'">
         <label class="checkbox-label">
           <input type="checkbox" v-model="isAllSelected" class="cyber-checkbox" /> {{ $t('batch.selectAll') }}
         </label>
@@ -673,6 +693,39 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
       </div>
 
       <TodoItemsList
+        v-if="displayMode === 'LIST'"
+        :todos="todos"
+        :selectedIds="selectedIds"
+        :editingId="editingId"
+        :editTodoForm="editTodoForm"
+        :viewMode="viewMode"
+        :submitting="submitting"
+        :categoryListId="CATEGORY_LIST_ID"
+        :tagListId="TAG_LIST_ID"
+        :expandedTodoIds="expandedTodoIds"
+        :checklistItemsByTodoId="checklistItemsByTodoId"
+        :checklistSummaryByTodoId="checklistSummaryByTodoId"
+        :checklistDraftByTodoId="checklistDraftByTodoId"
+        :checklistLoadingTodoIds="checklistLoadingTodoIds"
+        :checklistCreatingTodoIds="checklistCreatingTodoIds"
+        :checklistPendingSubItemIdsByTodoId="checklistPendingSubItemIdsByTodoId"
+        @update:selected="handleSelectedUpdate"
+        @update:editForm="handleEditFormUpdate"
+        @toggleStatus="toggleStatus"
+        @startEdit="startEdit"
+        @cancelEdit="cancelEdit"
+        @saveEdit="saveEdit"
+        @deleteTodo="deleteTodo"
+        @restoreTodo="restoreTodo"
+        @toggleChecklist="toggleChecklist"
+        @update:checklistDraftTitle="updateChecklistDraftTitle"
+        @createSubItem="createSubItem"
+        @toggleSubItemStatus="toggleSubItemStatus"
+        @deleteSubItem="deleteSubItem"
+      />
+
+      <TodoKanbanView
+        v-if="displayMode === 'KANBAN' && viewMode === 'ACTIVE'"
         :todos="todos"
         :selectedIds="selectedIds"
         :editingId="editingId"
@@ -704,6 +757,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
       />
 
       <TodoPagination 
+        v-if="displayMode === 'LIST'" 
         :pageData="pageData"
         :loading="loading"
         @prevPage="prevPage"

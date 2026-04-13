@@ -8,6 +8,8 @@ const en = {
     refresh: 'Refresh',
     activeTasks: 'Active Tasks',
     recycleBin: 'Recycle Bin',
+    listView: 'List View',
+    kanbanView: 'Kanban View',
     manageCategories: 'Manage Categories/Tags',
     localeLabel: 'Language',
   },
@@ -50,6 +52,9 @@ const en = {
     na: 'N/A'
   },
   status: {
+    PENDING: 'Pending',
+    IN_PROGRESS: 'In Progress',
+    DONE: 'Done',
     initiating: 'Initiating neuro-link...',
     empty: 'No tasks found. The grid is quiet.',
     markAsPending: 'Mark as Pending',
@@ -97,6 +102,40 @@ const en = {
     endTime: 'End Date',
     nextTrigger: 'Scheduled: {time}',
     completedAt: 'Completed: {time}'
+  },
+  stats: {
+    panelTitle: 'Stats Panel',
+    todayCompleted: 'Today Completed',
+    weekCompleted: 'Week Completed',
+    overdueCount: 'Overdue Tasks',
+    activeCount: 'Active Tasks',
+    categoryStats: 'Category Stats',
+    trend7d: '7-Day Trend',
+    uncategorized: 'Uncategorized',
+    activeLabel: 'Active: {count}',
+    completedLabel: 'Completed: {count}',
+    completedOnlyLabel: 'Completed: {count}',
+    empty: 'No stats available'
+  },
+  kanban: {
+    pendingColumn: 'Pending',
+    doneColumn: 'Done',
+    emptyColumn: 'No tasks in this column'
+  },
+  auth: {
+    loginTitle: 'Access Terminal',
+    registerTitle: 'Initialize Connection',
+    username: 'Username',
+    loginIdentifier: 'Username or Email',
+    password: 'Password',
+    email: 'Email',
+    loginBtn: 'Login',
+    registerBtn: 'Register',
+    noAccount: 'No credentials?',
+    registerLink: 'Create account',
+    hasAccount: 'Already registered?',
+    loginLink: 'Login here',
+    logout: 'Disconnect'
   }
 }
 

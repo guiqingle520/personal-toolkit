@@ -1,0 +1,7 @@
+-- Deprecated: retained only for backward reference.
+-- Please use the safer two-phase migration flow instead:
+--   1) alter_todo_item_add_user_id_phase1.sql
+--   2) alter_todo_item_add_user_id_phase2.sql
+--
+-- Phase 1 adds the nullable column only.
+-- Phase 2 performs legacy backfill, then applies NOT NULL / FK / indexes.
