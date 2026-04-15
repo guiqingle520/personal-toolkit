@@ -57,7 +57,7 @@ describe('TodoFilters', () => {
     await statusSelect.setValue('DONE')
     await prioritySelect.setValue('4')
 
-    const dateInputs = wrapper.findAll('input[type="date"]')
+    const dateInputs = wrapper.findAll('.localized-date-input-wrapper input')
     await dateInputs[0].setValue('2026-04-07')
 
     const updates = wrapper.emitted('update:filters')

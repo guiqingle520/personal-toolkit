@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import TodoSubItemList from './TodoSubItemList.vue'
+import LocalizedDateInput from './LocalizedDateInput.vue'
 import {
   formatPriorityLabel,
   formatRecurrenceLabelKey,
@@ -78,7 +79,7 @@ function formatTimestamp(value: string, loc: string): string {
             <option :value="5">{{ $t('priority.critical') }}</option>
           </select>
           <input :value="editForm.category" type="text" :placeholder="$t('filter.category')" class="cyber-input form-sm" :list="categoryListId" @input="$emit('update:editForm', { ...editForm, category: ($event.target as HTMLInputElement).value })" />
-          <input :value="editForm.dueDate" type="date" class="cyber-input form-sm" @input="$emit('update:editForm', { ...editForm, dueDate: ($event.target as HTMLInputElement).value })" />
+          <LocalizedDateInput :modelValue="editForm.dueDate" class="cyber-input form-sm" @update:modelValue="$emit('update:editForm', { ...editForm, dueDate: $event })" />
           <input :value="editForm.tags" type="text" :placeholder="$t('form.tagsCsvEdit')" class="cyber-input form-sm" :list="tagListId" @input="$emit('update:editForm', { ...editForm, tags: ($event.target as HTMLInputElement).value })" />
           </div>
           <div class="edit-row">
@@ -89,7 +90,7 @@ function formatTimestamp(value: string, loc: string): string {
               <option value="MONTHLY">{{ $t('recurrence.monthly') }}</option>
             </select>
             <input v-if="editForm.recurrenceType" :value="editForm.recurrenceInterval || 1" type="number" min="1" :placeholder="$t('recurrence.interval')" class="cyber-input form-sm" @input="$emit('update:editForm', { ...editForm, recurrenceInterval: Number(($event.target as HTMLInputElement).value) })" />
-            <input v-if="editForm.recurrenceType" :value="editForm.recurrenceEndTime" type="date" :placeholder="$t('recurrence.endTime')" class="cyber-input form-sm" @input="$emit('update:editForm', { ...editForm, recurrenceEndTime: ($event.target as HTMLInputElement).value })" />
+            <LocalizedDateInput v-if="editForm.recurrenceType" :modelValue="editForm.recurrenceEndTime" :placeholder="$t('recurrence.endTime')" class="cyber-input form-sm" @update:modelValue="$emit('update:editForm', { ...editForm, recurrenceEndTime: $event })" />
           </div>
         <div class="edit-actions">
           <button class="btn btn-sm btn-success" @click="$emit('saveEdit')" :disabled="submitting">{{ $t('form.save') }}</button>

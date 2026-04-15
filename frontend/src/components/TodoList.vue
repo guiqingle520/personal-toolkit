@@ -23,7 +23,7 @@ function handleSelectedUpdate(id: number, selected: boolean) {
   }
 }
 
-import { persistLocale, type AppLocale } from '../i18n'
+import { persistLocale, syncDocumentLocale, type AppLocale } from '../i18n'
 import {
   formatDateForInput,
   toDateTimeValue,
@@ -122,6 +122,7 @@ watch(viewMode, () => {
 
 watch(locale, (newLocale) => {
   persistLocale(newLocale as AppLocale)
+  syncDocumentLocale(newLocale as AppLocale)
 })
 
 function handleLocaleUpdate(nextLocale: AppLocale) {

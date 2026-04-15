@@ -2,6 +2,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TodoList from './TodoList.vue'
 import i18n from '../i18n'
+import { syncDocumentLocale } from '../i18n'
 
 const fetchMock = vi.fn()
 
@@ -141,7 +142,7 @@ function getFilterControls(wrapper) {
     search: filterSection.findAll('input')[0],
     status: filterSection.findAll('select')[0],
     priority: filterSection.findAll('select')[1],
-    dueDateFrom: filterSection.findAll('input[type="date"]')[0],
+    dueDateFrom: filterSection.findAll('.localized-date-input-wrapper input')[0],
     resetButton: filterSection.find('button.btn-ghost'),
   }
 }
@@ -182,6 +183,7 @@ describe('TodoList reset behavior', () => {
     await controls.status.setValue('DONE')
     await controls.priority.setValue('4')
     await controls.dueDateFrom.setValue('2026-04-09')
+    await controls.dueDateFrom.trigger('blur')
 
     ;(wrapper.vm).filters.page = 3
 
@@ -324,18 +326,27 @@ describe('TodoList reset behavior', () => {
     expect(wrapper.text()).not.toContain('Kanban View')
   })
 
+  it('syncs document lang when locale changes so native date inputs can follow app locale', async () => {
+    document.documentElement.lang = 'zh-CN'
+
+    syncDocumentLocale('en')
+
+    expect(document.documentElement.lang).toBe('en')
+  })
+
   it('sends create payload with serialized due date', async () => {
     const wrapper = await mountTodoList()
     const createRows = wrapper.findAll('.create-form .create-row')
     const titleInput = createRows[0].find('input[type="text"]')
     const prioritySelect = createRows[0].find('select')
-    const dueDateInput = createRows[1].find('input[type="date"]')
+    const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
     const tagsInput = createRows[1].findAll('input[type="text"]')[0]
     const addButton = createRows[1].find('button.btn-primary')
 
     await titleInput.setValue('Ship contract tests')
     await prioritySelect.setValue('4')
     await dueDateInput.setValue('2026-04-10')
+    await dueDateInput.trigger('blur')
     await tagsInput.setValue('qa,api')
     await addButton.trigger('click')
     await flushPromises()
@@ -361,13 +372,15 @@ describe('TodoList reset behavior', () => {
     const createRows = wrapper.findAll('.create-form .create-row')
     const titleInput = createRows[0].find('input[type="text"]')
     const recurrenceSelect = createRows[1].find('select')
-    const dueDateInput = createRows[1].find('input[type="date"]')
+    const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
 
     await titleInput.setValue('Daily standup')
     await dueDateInput.setValue('2026-04-10')
+    await dueDateInput.trigger('blur')
     await recurrenceSelect.setValue('DAILY')
     await createRows[1].findAll('input[type="number"]')[0].setValue('2')
-    await createRows[1].findAll('input[type="date"]')[1].setValue('2026-05-10')
+    await createRows[1].findAll('.localized-date-input-wrapper input')[1].setValue('2026-05-10')
+    await createRows[1].findAll('.localized-date-input-wrapper input')[1].trigger('blur')
     await createRows[1].find('button.btn-primary').trigger('click')
     await flushPromises()
 

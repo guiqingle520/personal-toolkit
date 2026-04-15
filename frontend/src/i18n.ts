@@ -43,4 +43,12 @@ export function persistLocale(locale: AppLocale): void {
   globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, locale)
 }
 
+export function syncDocumentLocale(locale: AppLocale): void {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  document.documentElement.lang = locale
+}
+
 export default i18n

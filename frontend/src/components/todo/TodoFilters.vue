@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TodoFiltersModel } from './types'
+import LocalizedDateInput from './LocalizedDateInput.vue'
 
 defineProps<{
   filters: TodoFiltersModel
@@ -31,8 +32,8 @@ defineEmits<{
       </select>
       <input :value="filters.category" type="text" :placeholder="$t('filter.category')" class="cyber-input form-sm" :list="categoryListId" @input="$emit('update:filters', { ...filters, category: ($event.target as HTMLInputElement).value })" @keyup.enter="$emit('loadTodos')" />
       <input :value="filters.tag" type="text" :placeholder="$t('filter.tag')" class="cyber-input form-sm" :list="tagListId" @input="$emit('update:filters', { ...filters, tag: ($event.target as HTMLInputElement).value })" @keyup.enter="$emit('loadTodos')" />
-      <input :value="filters.dueDateFrom" type="date" class="cyber-input form-sm" @change="$emit('update:filters', { ...filters, dueDateFrom: ($event.target as HTMLInputElement).value }); $emit('loadTodos')" />
-      <input :value="filters.dueDateTo" type="date" class="cyber-input form-sm" @change="$emit('update:filters', { ...filters, dueDateTo: ($event.target as HTMLInputElement).value }); $emit('loadTodos')" />
+      <LocalizedDateInput :modelValue="filters.dueDateFrom" class="cyber-input form-sm" @update:modelValue="$emit('update:filters', { ...filters, dueDateFrom: $event })" @change="$emit('loadTodos')" />
+      <LocalizedDateInput :modelValue="filters.dueDateTo" class="cyber-input form-sm" @update:modelValue="$emit('update:filters', { ...filters, dueDateTo: $event })" @change="$emit('loadTodos')" />
       <button class="btn btn-ghost btn-sm" @click="$emit('resetFilters')">{{ $t('filter.reset') }}</button>
     </div>
   </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TodoDraft } from './types'
+import LocalizedDateInput from './LocalizedDateInput.vue'
 
 defineProps<{
   newTodo: TodoDraft
@@ -26,7 +27,7 @@ defineEmits<{
       <input :value="newTodo.category" type="text" :placeholder="$t('filter.category')" class="cyber-input" :list="categoryListId" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, category: ($event.target as HTMLInputElement).value })" />
     </div>
     <div class="create-row">
-      <input :value="newTodo.dueDate" type="date" class="cyber-input" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, dueDate: ($event.target as HTMLInputElement).value })" />
+      <LocalizedDateInput :modelValue="newTodo.dueDate" class="cyber-input" :disabled="submitting" @update:modelValue="$emit('update:newTodo', { ...newTodo, dueDate: $event })" />
       <input :value="newTodo.tags" type="text" :placeholder="$t('form.tagsCsv')" class="cyber-input flex-2" :list="tagListId" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, tags: ($event.target as HTMLInputElement).value })" @keyup.enter="$emit('createTodo')" />
       <select :value="newTodo.recurrenceType || ''" class="cyber-input" :disabled="submitting" @change="$emit('update:newTodo', { ...newTodo, recurrenceType: ($event.target as HTMLSelectElement).value || undefined })">
         <option value="">{{ $t('recurrence.none') }}</option>
@@ -35,7 +36,7 @@ defineEmits<{
         <option value="MONTHLY">{{ $t('recurrence.monthly') }}</option>
       </select>
       <input v-if="newTodo.recurrenceType" :value="newTodo.recurrenceInterval || 1" type="number" min="1" :placeholder="$t('recurrence.interval')" class="cyber-input" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, recurrenceInterval: Number(($event.target as HTMLInputElement).value) })" />
-      <input v-if="newTodo.recurrenceType" :value="newTodo.recurrenceEndTime" type="date" :placeholder="$t('recurrence.endTime')" class="cyber-input" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, recurrenceEndTime: ($event.target as HTMLInputElement).value })" />
+      <LocalizedDateInput v-if="newTodo.recurrenceType" :modelValue="newTodo.recurrenceEndTime" :placeholder="$t('recurrence.endTime')" class="cyber-input" :disabled="submitting" @update:modelValue="$emit('update:newTodo', { ...newTodo, recurrenceEndTime: $event })" />
       <button class="btn btn-primary" :disabled="submitting || !newTodo.title.trim()" @click="$emit('createTodo')">
         {{ $t('form.addTask') }}
       </button>
