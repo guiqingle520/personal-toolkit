@@ -70,6 +70,8 @@ class AuthServiceTest {
         AuthLoginRequest request = new AuthLoginRequest();
         request.setUsername("Alice@Example.com");
         request.setPassword("password123");
+        request.setCaptchaId("captcha-id");
+        request.setCaptchaCode("AB12C");
 
         AppUser appUser = createUser();
         AppUserPrincipal principal = AppUserPrincipal.from(appUser);

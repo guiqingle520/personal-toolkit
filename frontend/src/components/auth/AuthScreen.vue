@@ -10,9 +10,24 @@ const isLogin = ref(true)
 const username = ref('')
 const email = ref('')
 const password = ref('')
+const captchaId = ref('')
+const captchaCode = ref('')
+const captchaImage = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
+
+async function loadCaptcha() {
+  try {
+    const res = await fetchApi<{ captchaId: string; image: string }>('/api/auth/captcha', { method: 'GET' }, t)
+    captchaId.value = res.data?.captchaId ?? ''
+    captchaImage.value = res.data?.image ?? ''
+    captchaCode.value = ''
+  } catch {
+    captchaId.value = ''
+    captchaImage.value = ''
+  }
+}
 
 async function submit() {
   loading.value = true
@@ -22,7 +37,7 @@ async function submit() {
   try {
     const endpoint = isLogin.value ? '/api/auth/login' : '/api/auth/register'
     const body = isLogin.value
-      ? { username: username.value, password: password.value }
+      ? { username: username.value, password: password.value, captchaId: captchaId.value, captchaCode: captchaCode.value }
       : { username: username.value, email: email.value, password: password.value }
 
     const res = await fetchApi<{ token: string; user?: { id: number; username: string; email?: string } }>(endpoint, {
@@ -34,6 +49,9 @@ async function submit() {
       setSession(res.data.token, res.data.user ?? null)
     }
   } catch (error) {
+    if (isLogin.value) {
+      await loadCaptcha()
+    }
     if (error instanceof Error) {
       try {
         const parsed = JSON.parse(error.message)
@@ -49,6 +67,10 @@ async function submit() {
   } finally {
     loading.value = false
   }
+}
+
+if (isLogin.value) {
+  void loadCaptcha()
 }
 </script>
 
@@ -94,6 +116,28 @@ async function submit() {
           />
         </div>
 
+        <div class="form-group" v-if="isLogin">
+          <label for="captcha">{{ $t('auth.captcha') }}</label>
+          <div class="captcha-row">
+            <img
+              v-if="captchaImage"
+              :src="captchaImage"
+              :alt="$t('auth.captcha')"
+              class="captcha-image"
+            />
+            <button type="button" class="btn btn-ghost btn-sm" @click="loadCaptcha">{{ $t('auth.refreshCaptcha') }}</button>
+          </div>
+          <input
+            id="captcha"
+            v-model="captchaCode"
+            type="text"
+            class="cyber-input"
+            :placeholder="$t('auth.captchaPlaceholder')"
+            required
+            autocomplete="off"
+          />
+        </div>
+
         <div v-if="errorMessage" class="error-banner">
           <strong>{{ $t('status.error') }}</strong> {{ errorMessage }}
           <ul v-if="Object.keys(validationErrors).length > 0" class="validation-list">
@@ -115,7 +159,7 @@ async function submit() {
           </span>
           <span v-else>
             {{ $t('auth.hasAccount') }} 
-            <a href="#" @click.prevent="isLogin = true; errorMessage = ''; validationErrors = {}">{{ $t('auth.loginLink') }}</a>
+            <a href="#" @click.prevent="isLogin = true; errorMessage = ''; validationErrors = {}; loadCaptcha()">{{ $t('auth.loginLink') }}</a>
           </span>
         </div>
       </div>
@@ -158,6 +202,18 @@ async function submit() {
 .form-group label {
   font-size: 0.9rem;
   color: var(--text-secondary);
+}
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.captcha-image {
+  height: 40px;
+  min-width: 120px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
 }
 .auth-submit {
   margin-top: 8px;

@@ -16,6 +16,14 @@ public class AuthLoginRequest {
     @Size(max = 100, message = "password must not exceed 100 characters")
     private String password;
 
+    @NotBlank(message = "captchaId must not be blank")
+    @Size(max = 64, message = "captchaId must not exceed 64 characters")
+    private String captchaId;
+
+    @NotBlank(message = "captchaCode must not be blank")
+    @Size(max = 16, message = "captchaCode must not exceed 16 characters")
+    private String captchaCode;
+
     /**
      * 返回登录用户名。
      *
@@ -50,5 +58,41 @@ public class AuthLoginRequest {
      */
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    /**
+     * 返回验证码标识。
+     *
+     * @return 验证码标识
+     */
+    public String getCaptchaId() {
+        return captchaId;
+    }
+
+    /**
+     * 设置验证码标识。
+     *
+     * @param captchaId 验证码标识
+     */
+    public void setCaptchaId(String captchaId) {
+        this.captchaId = captchaId;
+    }
+
+    /**
+     * 返回验证码答案。
+     *
+     * @return 验证码答案
+     */
+    public String getCaptchaCode() {
+        return captchaCode;
+    }
+
+    /**
+     * 设置验证码答案。
+     *
+     * @param captchaCode 验证码答案
+     */
+    public void setCaptchaCode(String captchaCode) {
+        this.captchaCode = captchaCode;
     }
 }

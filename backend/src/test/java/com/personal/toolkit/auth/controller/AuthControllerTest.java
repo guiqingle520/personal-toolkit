@@ -5,12 +5,14 @@ import com.personal.toolkit.auth.config.SecurityConfig;
 import com.personal.toolkit.auth.dto.AuthLoginRequest;
 import com.personal.toolkit.auth.dto.AuthRegisterRequest;
 import com.personal.toolkit.auth.dto.AuthTokenResponse;
+import com.personal.toolkit.auth.dto.CaptchaResponse;
 import com.personal.toolkit.auth.dto.UserProfileResponse;
 import com.personal.toolkit.auth.security.AppUserDetailsService;
 import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
 import com.personal.toolkit.auth.security.JwtTokenService;
 import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
 import com.personal.toolkit.auth.service.AuthService;
+import com.personal.toolkit.auth.service.CaptchaService;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -49,6 +52,9 @@ class AuthControllerTest {
 
     @MockBean
     private AuthService authService;
+
+    @MockBean
+    private CaptchaService captchaService;
 
     @MockBean
     private JwtTokenService jwtTokenService;
@@ -86,6 +92,8 @@ class AuthControllerTest {
         AuthLoginRequest request = new AuthLoginRequest();
         request.setUsername("alice");
         request.setPassword("password123");
+        request.setCaptchaId("captcha-id");
+        request.setCaptchaCode("AB12C");
 
         when(authService.login(any(AuthLoginRequest.class))).thenReturn(authTokenResponse());
 
@@ -97,6 +105,23 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Login successful"))
                 .andExpect(jsonPath("$.data.token").value("jwt-token"))
                 .andExpect(jsonPath("$.data.user.email").value("alice@example.com"));
+    }
+
+    /**
+     * 验证码接口应允许匿名访问，并返回验证码标识与图片数据。
+     */
+    @Test
+    void captchaShouldReturnCaptchaPayload() throws Exception {
+        when(captchaService.issueCaptcha(any())).thenReturn(new CaptchaResponse("captcha-id", "data:image/svg+xml;base64,abc", 120));
+
+        mockMvc.perform(get("/api/auth/captcha"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Captcha generated successfully"))
+                .andExpect(jsonPath("$.data.captchaId").value("captcha-id"))
+                .andExpect(jsonPath("$.data.expiresInSeconds").value(120));
+
+        verify(captchaService).issueCaptcha("127.0.0.1");
     }
 
     /**
@@ -146,6 +171,8 @@ class AuthControllerTest {
         AuthLoginRequest request = new AuthLoginRequest();
         request.setUsername("alice");
         request.setPassword("bad-password");
+        request.setCaptchaId("captcha-id");
+        request.setCaptchaCode("AB12C");
         when(authService.login(any(AuthLoginRequest.class)))
                 .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "Invalid username or password"));
 
