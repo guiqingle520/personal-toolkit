@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '../../composables/useAuth'
-import { fetchApi } from '../../api'
+import { fetchApi, type ApiError } from '../../api'
 
 const { t } = useI18n()
 const { setSession } = useAuth()
@@ -16,8 +16,43 @@ const captchaImage = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
+const captchaEnabled = ref(false)
+const adaptiveCaptcha = ref(false)
+const adaptiveTriggerThreshold = ref(1)
+const showCaptcha = ref(false)
+
+async function loadLoginPolicy() {
+  try {
+    const res = await fetchApi<{ captchaEnabled: boolean; adaptiveCaptcha: boolean; adaptiveTriggerThreshold: number }>('/api/auth/login-policy', { method: 'GET' }, t)
+    captchaEnabled.value = res.data?.captchaEnabled ?? false
+    adaptiveCaptcha.value = res.data?.adaptiveCaptcha ?? false
+    adaptiveTriggerThreshold.value = res.data?.adaptiveTriggerThreshold ?? 1
+    showCaptcha.value = captchaEnabled.value && !adaptiveCaptcha.value
+
+    if (showCaptcha.value) {
+      await loadCaptcha()
+      return
+    }
+
+    captchaId.value = ''
+    captchaImage.value = ''
+    captchaCode.value = ''
+  } catch {
+    captchaEnabled.value = false
+    adaptiveCaptcha.value = false
+    adaptiveTriggerThreshold.value = 1
+    showCaptcha.value = false
+    captchaId.value = ''
+    captchaImage.value = ''
+    captchaCode.value = ''
+  }
+}
 
 async function loadCaptcha() {
+  if (!captchaEnabled.value) {
+    return
+  }
+
   try {
     const res = await fetchApi<{ captchaId: string; image: string }>('/api/auth/captcha', { method: 'GET' }, t)
     captchaId.value = res.data?.captchaId ?? ''
@@ -49,19 +84,28 @@ async function submit() {
       setSession(res.data.token, res.data.user ?? null)
     }
   } catch (error) {
-    if (isLogin.value) {
-      await loadCaptcha()
-    }
     if (error instanceof Error) {
       try {
-        const parsed = JSON.parse(error.message)
+        const parsed = JSON.parse(error.message) as ApiError
+        if (parsed.code === 'CAPTCHA_REQUIRED' && captchaEnabled.value) {
+          showCaptcha.value = true
+          await loadCaptcha()
+        } else if (isLogin.value && showCaptcha.value) {
+          await loadCaptcha()
+        }
         errorMessage.value = parsed.message || t('feedback.genericError')
         validationErrors.value = parsed.validation || {}
       } catch {
+        if (isLogin.value && showCaptcha.value) {
+          await loadCaptcha()
+        }
         errorMessage.value = error.message
         validationErrors.value = {}
       }
     } else {
+      if (isLogin.value && showCaptcha.value) {
+        await loadCaptcha()
+      }
       errorMessage.value = t('feedback.unexpectedError')
     }
   } finally {
@@ -70,7 +114,7 @@ async function submit() {
 }
 
 if (isLogin.value) {
-  void loadCaptcha()
+  void loadLoginPolicy()
 }
 </script>
 
@@ -116,7 +160,7 @@ if (isLogin.value) {
           />
         </div>
 
-        <div class="form-group" v-if="isLogin">
+        <div class="form-group" v-if="isLogin && showCaptcha">
           <label for="captcha">{{ $t('auth.captcha') }}</label>
           <div class="captcha-row">
             <img
@@ -155,11 +199,11 @@ if (isLogin.value) {
       <div class="auth-toggle">
         <span v-if="isLogin">
           {{ $t('auth.noAccount') }} 
-            <a href="#" @click.prevent="isLogin = false; errorMessage = ''; validationErrors = {}">{{ $t('auth.registerLink') }}</a>
+            <a href="#" @click.prevent="isLogin = false; errorMessage = ''; validationErrors = {}; showCaptcha = false; captchaId = ''; captchaImage = ''; captchaCode = ''">{{ $t('auth.registerLink') }}</a>
           </span>
           <span v-else>
             {{ $t('auth.hasAccount') }} 
-            <a href="#" @click.prevent="isLogin = true; errorMessage = ''; validationErrors = {}; loadCaptcha()">{{ $t('auth.loginLink') }}</a>
+            <a href="#" @click.prevent="isLogin = true; errorMessage = ''; validationErrors = {}; void loadLoginPolicy()">{{ $t('auth.loginLink') }}</a>
           </span>
         </div>
       </div>

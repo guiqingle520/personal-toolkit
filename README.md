@@ -227,6 +227,8 @@ npm run dev
 
 - JWT 登录 / 注册 / 退出
 - 支持用户名或邮箱登录
+- 登录随机验证码（SVG）
+- 登录失败按 IP / 标识限流
 - 当前用户登录态恢复（前端本地持久化）
 - Todo 数据按账号隔离
 - Todo 基础 CRUD
@@ -248,3 +250,90 @@ npm run dev
 - `docs/phase-3-plan-v3.md`：Phase 3 收尾归档版
 - `docs/phase-4-plan-v1.md`：Phase 4 起始规划版
 - `docs/operation-manual.md`：操作手册
+
+## 登录验证码联调说明
+
+当前登录流程支持两种模式：
+
+- 固定验证码模式：先获取验证码，再提交登录请求。
+- 自适应验证码模式：首次可直接提交用户名/密码；如果服务端判定当前登录存在风险，会返回 `CAPTCHA_REQUIRED`，前端再补拉验证码并重试。
+
+前端可先调用 `GET /api/auth/login-policy` 获取当前模式。
+
+### 登录策略接口返回
+
+```json
+{
+  "success": true,
+  "message": "Login policy fetched successfully",
+  "data": {
+    "captchaEnabled": true,
+    "adaptiveCaptcha": false,
+    "adaptiveTriggerThreshold": 2
+  }
+}
+```
+
+### 固定验证码模式接口顺序
+
+1. `GET /api/auth/captcha`
+2. `POST /api/auth/login`
+
+### 验证码接口返回
+
+```json
+{
+  "success": true,
+  "message": "Captcha generated successfully",
+  "data": {
+    "captchaId": "<captcha-id>",
+    "image": "data:image/svg+xml;base64,...",
+    "expiresInSeconds": 120
+  }
+}
+```
+
+### 登录请求示例
+
+```json
+{
+  "username": "alice@example.com",
+  "password": "password123",
+  "captchaId": "<captcha-id>",
+  "captchaCode": "AB12C"
+}
+```
+
+### 常见错误码
+
+- `400`：`CAPTCHA_REQUIRED`
+- `400`：`Captcha expired or invalid`
+- `400`：`Captcha verification failed`
+- `401`：`Invalid username or password`
+- `429`：`Too many captcha requests, please try again later`
+- `429`：`Too many failed login attempts, please try again later`
+
+### 安全策略配置
+
+后端支持通过环境变量调整验证码与限流策略：
+
+- `APP_AUTH_CAPTCHA_ENABLED`
+- `APP_AUTH_CAPTCHA_ADAPTIVE`
+- `APP_AUTH_CAPTCHA_ADAPTIVE_TRIGGER_THRESHOLD`
+- `APP_AUTH_CAPTCHA_LENGTH`
+- `APP_AUTH_CAPTCHA_MAX_ATTEMPTS`
+- `APP_AUTH_CAPTCHA_TTL`
+- `APP_AUTH_CAPTCHA_ISSUE_THRESHOLD`
+- `APP_AUTH_CAPTCHA_ISSUE_WINDOW`
+- `APP_AUTH_CAPTCHA_LOGIN_FAIL_THRESHOLD`
+- `APP_AUTH_CAPTCHA_LOGIN_FAIL_WINDOW`
+
+当前默认策略：
+
+- 验证码始终开启
+- 自适应验证码默认关闭
+- 自适应验证码触发阈值默认 2 次失败
+- 有效期 120 秒
+- 最多尝试 3 次
+- 验证码获取限流：1 分钟 20 次 / IP
+- 登录失败限流：15 分钟 5 次 / IP 或标识

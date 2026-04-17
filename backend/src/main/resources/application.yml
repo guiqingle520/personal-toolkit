@@ -51,3 +51,14 @@ app:
       secret: ${APP_AUTH_JWT_SECRET:uizFVR6Xqk4LzrbdSjOPDXz9r3mrI3FbTsT8z6jTexs=}
       issuer: ${APP_AUTH_JWT_ISSUER:personal-toolkit-backend}
       expiration: ${APP_AUTH_JWT_EXPIRATION:PT12H}
+    captcha:
+      enabled: ${APP_AUTH_CAPTCHA_ENABLED:true}
+      adaptive: ${APP_AUTH_CAPTCHA_ADAPTIVE:false}
+      adaptive-trigger-threshold: ${APP_AUTH_CAPTCHA_ADAPTIVE_TRIGGER_THRESHOLD:2}
+      length: ${APP_AUTH_CAPTCHA_LENGTH:5}
+      max-attempts: ${APP_AUTH_CAPTCHA_MAX_ATTEMPTS:3}
+      ttl: ${APP_AUTH_CAPTCHA_TTL:PT2M}
+      issue-threshold: ${APP_AUTH_CAPTCHA_ISSUE_THRESHOLD:20}
+      issue-window: ${APP_AUTH_CAPTCHA_ISSUE_WINDOW:PT1M}
+      login-fail-threshold: ${APP_AUTH_CAPTCHA_LOGIN_FAIL_THRESHOLD:5}
+      login-fail-window: ${APP_AUTH_CAPTCHA_LOGIN_FAIL_WINDOW:PT15M}

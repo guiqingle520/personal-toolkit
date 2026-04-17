@@ -1,6 +1,10 @@
 package com.personal.toolkit.auth.service;
 
+import com.personal.toolkit.auth.config.CaptchaProperties;
 import com.personal.toolkit.auth.dto.CaptchaResponse;
+import com.personal.toolkit.common.exception.ApiException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,32 +20,31 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static org.springframework.util.StringUtils.hasText;
+
 /**
  * 负责登录验证码的生成、存储、校验与登录失败频控。
  */
 @Service
 public class CaptchaService {
 
+    private static final Logger log = LoggerFactory.getLogger(CaptchaService.class);
+
     private static final String CAPTCHA_KEY_PREFIX = "auth:captcha:";
     private static final String CAPTCHA_ISSUE_IP_PREFIX = "auth:captcha:issue:ip:";
     private static final String LOGIN_FAIL_IP_PREFIX = "auth:login:fail:ip:";
     private static final String LOGIN_FAIL_ID_PREFIX = "auth:login:fail:id:";
 
-    private static final Duration CAPTCHA_TTL = Duration.ofSeconds(120);
-    private static final Duration CAPTCHA_ISSUE_TTL = Duration.ofMinutes(1);
-    private static final Duration LOGIN_FAIL_TTL = Duration.ofMinutes(15);
-    private static final int CAPTCHA_MAX_ATTEMPTS = 3;
-    private static final int CAPTCHA_ISSUE_THRESHOLD = 20;
-    private static final int LOGIN_FAIL_THRESHOLD = 5;
-    private static final int CAPTCHA_LENGTH = 5;
-
     private static final String CAPTCHA_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final CaptchaProperties captchaProperties;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public CaptchaService(RedisTemplate<String, Object> redisTemplate) {
+    public CaptchaService(RedisTemplate<String, Object> redisTemplate,
+                          CaptchaProperties captchaProperties) {
         this.redisTemplate = redisTemplate;
+        this.captchaProperties = captchaProperties;
     }
 
     /**
@@ -50,22 +53,39 @@ public class CaptchaService {
      * @return 验证码响应体
      */
     public CaptchaResponse issueCaptcha(String clientIp) {
+        if (!captchaProperties.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Captcha is disabled");
+        }
+
         enforceCaptchaIssueThrottle(clientIp);
 
         String captchaId = randomId(24);
-        String answer = randomCaptchaText(CAPTCHA_LENGTH);
+        String answer = randomCaptchaText(captchaProperties.getLength());
         String answerHash = hashAnswer(answer);
 
         Map<String, Object> payload = Map.of(
                 "answerHash", answerHash,
-                "attemptsLeft", CAPTCHA_MAX_ATTEMPTS
+                "attemptsLeft", captchaProperties.getMaxAttempts()
         );
 
-        redisTemplate.opsForValue().set(captchaRedisKey(captchaId), payload, CAPTCHA_TTL);
+        redisTemplate.opsForValue().set(captchaRedisKey(captchaId), payload, captchaProperties.getTtl());
+        log.info("Issued login captcha captchaId={} clientIp={} ttlSeconds={}", captchaId, clientIp, captchaProperties.getTtl().toSeconds());
 
         String svg = buildCaptchaSvg(answer);
         String image = "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(svg.getBytes(StandardCharsets.UTF_8));
-        return new CaptchaResponse(captchaId, image, (int) CAPTCHA_TTL.getSeconds());
+        return new CaptchaResponse(captchaId, image, (int) captchaProperties.getTtl().getSeconds());
+    }
+
+    public boolean isCaptchaEnabled() {
+        return captchaProperties.isEnabled();
+    }
+
+    public boolean isAdaptiveCaptchaEnabled() {
+        return captchaProperties.isEnabled() && captchaProperties.isAdaptive();
+    }
+
+    public int getAdaptiveTriggerThreshold() {
+        return Math.max(captchaProperties.getAdaptiveTriggerThreshold(), 1);
     }
 
     /**
@@ -76,13 +96,14 @@ public class CaptchaService {
     public void enforceCaptchaIssueThrottle(String clientIp) {
         String key = captchaIssueIpKey(clientIp);
         long issueCount = readFailCount(key);
-        if (issueCount >= CAPTCHA_ISSUE_THRESHOLD) {
+        if (issueCount >= captchaProperties.getIssueThreshold()) {
+            log.warn("Blocked captcha issuance due to rate limit clientIp={} currentCount={} threshold={}", clientIp, issueCount, captchaProperties.getIssueThreshold());
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many captcha requests, please try again later");
         }
 
         Long current = redisTemplate.opsForValue().increment(key);
         if (current != null && current == 1L) {
-            redisTemplate.expire(key, CAPTCHA_ISSUE_TTL);
+            redisTemplate.expire(key, captchaProperties.getIssueWindow());
         }
     }
 
@@ -96,17 +117,19 @@ public class CaptchaService {
         String redisKey = captchaRedisKey(captchaId);
         Object cached = redisTemplate.opsForValue().get(redisKey);
         if (!(cached instanceof Map<?, ?> map)) {
+            log.warn("Rejected login captcha because it was missing or expired captchaId={}", captchaId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha expired or invalid");
         }
 
         String answerHash = asString(map.get("answerHash"));
-        int attemptsLeft = asInteger(map.get("attemptsLeft"), CAPTCHA_MAX_ATTEMPTS);
+        int attemptsLeft = asInteger(map.get("attemptsLeft"), captchaProperties.getMaxAttempts());
         String inputHash = hashAnswer(captchaCode);
 
         if (!inputHash.equals(answerHash)) {
             int nextAttemptsLeft = attemptsLeft - 1;
             if (nextAttemptsLeft <= 0) {
                 redisTemplate.delete(redisKey);
+                log.warn("Rejected login captcha after attempts exhausted captchaId={}", captchaId);
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha verification failed");
             }
 
@@ -118,14 +141,51 @@ public class CaptchaService {
             Long ttlSeconds = redisTemplate.getExpire(redisKey, TimeUnit.SECONDS);
             if (ttlSeconds == null || ttlSeconds <= 0) {
                 redisTemplate.delete(redisKey);
+                log.warn("Rejected login captcha because remaining TTL was invalid captchaId={}", captchaId);
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha expired or invalid");
             }
 
             redisTemplate.opsForValue().set(redisKey, nextPayload, Duration.ofSeconds(ttlSeconds));
+            log.warn("Rejected login captcha due to answer mismatch captchaId={} attemptsLeft={}", captchaId, nextAttemptsLeft);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha verification failed");
         }
 
         redisTemplate.delete(redisKey);
+        log.info("Accepted login captcha captchaId={}", captchaId);
+    }
+
+    public boolean isCaptchaRequired(String clientIp, String loginIdentifier) {
+        if (!captchaProperties.isEnabled()) {
+            return false;
+        }
+
+        if (!captchaProperties.isAdaptive()) {
+            return true;
+        }
+
+        long ipFails = readFailCount(loginFailIpKey(clientIp));
+        long idFails = readFailCount(loginFailIdKey(normalizeIdentifier(loginIdentifier)));
+        long threshold = getAdaptiveTriggerThreshold();
+        return ipFails >= threshold || idFails >= threshold;
+    }
+
+    public void validateCaptchaIfNeeded(String clientIp,
+                                        String loginIdentifier,
+                                        String captchaId,
+                                        String captchaCode) {
+        boolean required = isCaptchaRequired(clientIp, loginIdentifier);
+        if (!required) {
+            if (hasText(captchaId) && hasText(captchaCode)) {
+                validateCaptcha(captchaId, captchaCode);
+            }
+            return;
+        }
+
+        if (!hasText(captchaId) || !hasText(captchaCode)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "CAPTCHA_REQUIRED", "Captcha required before login");
+        }
+
+        validateCaptcha(captchaId, captchaCode);
     }
 
     /**
@@ -138,7 +198,9 @@ public class CaptchaService {
         long ipFails = readFailCount(loginFailIpKey(clientIp));
         long idFails = readFailCount(loginFailIdKey(normalizeIdentifier(loginIdentifier)));
 
-        if (ipFails >= LOGIN_FAIL_THRESHOLD || idFails >= LOGIN_FAIL_THRESHOLD) {
+        if (ipFails >= captchaProperties.getLoginFailThreshold() || idFails >= captchaProperties.getLoginFailThreshold()) {
+            log.warn("Blocked login due to throttle clientIp={} identifier={} ipFails={} idFails={} threshold={}",
+                    clientIp, normalizeIdentifier(loginIdentifier), ipFails, idFails, captchaProperties.getLoginFailThreshold());
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many failed login attempts, please try again later");
         }
     }
@@ -152,6 +214,7 @@ public class CaptchaService {
     public void recordLoginFailure(String clientIp, String loginIdentifier) {
         incrementWithTtl(loginFailIpKey(clientIp));
         incrementWithTtl(loginFailIdKey(normalizeIdentifier(loginIdentifier)));
+        log.warn("Recorded login failure clientIp={} identifier={}", clientIp, normalizeIdentifier(loginIdentifier));
     }
 
     /**
@@ -162,12 +225,13 @@ public class CaptchaService {
      */
     public void clearLoginFailure(String clientIp, String loginIdentifier) {
         redisTemplate.delete(loginFailIdKey(normalizeIdentifier(loginIdentifier)));
+        log.info("Cleared identifier login failure counter after successful login clientIp={} identifier={}", clientIp, normalizeIdentifier(loginIdentifier));
     }
 
     private void incrementWithTtl(String key) {
         Long current = redisTemplate.opsForValue().increment(key);
         if (current != null && current == 1L) {
-            redisTemplate.expire(key, LOGIN_FAIL_TTL);
+            redisTemplate.expire(key, captchaProperties.getLoginFailWindow());
         }
     }
 

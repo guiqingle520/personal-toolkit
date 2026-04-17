@@ -16,11 +16,9 @@ public class AuthLoginRequest {
     @Size(max = 100, message = "password must not exceed 100 characters")
     private String password;
 
-    @NotBlank(message = "captchaId must not be blank")
     @Size(max = 64, message = "captchaId must not exceed 64 characters")
     private String captchaId;
 
-    @NotBlank(message = "captchaCode must not be blank")
     @Size(max = 16, message = "captchaCode must not exceed 16 characters")
     private String captchaCode;
 

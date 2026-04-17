@@ -1,5 +1,6 @@
 package com.personal.toolkit.auth.service;
 
+import com.personal.toolkit.auth.config.CaptchaProperties;
 import com.personal.toolkit.auth.dto.CaptchaResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -38,7 +40,7 @@ class CaptchaServiceTest {
 
     @BeforeEach
     void setUp() {
-        captchaService = new CaptchaService(redisTemplate);
+        captchaService = new CaptchaService(redisTemplate, new CaptchaProperties());
     }
 
     @Test
@@ -68,5 +70,41 @@ class CaptchaServiceTest {
 
         assertThrows(ResponseStatusException.class,
                 () -> captchaService.validateCaptcha("missing-id", "ABCDE"));
+    }
+
+    @Test
+    void isCaptchaRequiredShouldReturnFalseWhenAdaptiveEnabledAndNoRisk() {
+        CaptchaProperties properties = new CaptchaProperties();
+        properties.setAdaptive(true);
+        captchaService = new CaptchaService(redisTemplate, properties);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn(null);
+
+        assertFalse(captchaService.isCaptchaRequired("127.0.0.1", "alice@example.com"));
+    }
+
+    @Test
+    void validateCaptchaIfNeededShouldRequireCaptchaWhenAdaptiveRiskExists() {
+        CaptchaProperties properties = new CaptchaProperties();
+        properties.setAdaptive(true);
+        captchaService = new CaptchaService(redisTemplate, properties);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("auth:login:fail:ip:127.0.0.1")).thenReturn(2L);
+
+        assertThrows(com.personal.toolkit.common.exception.ApiException.class,
+                () -> captchaService.validateCaptchaIfNeeded("127.0.0.1", "alice@example.com", "", ""));
+    }
+
+    @Test
+    void isCaptchaRequiredShouldRespectAdaptiveTriggerThreshold() {
+        CaptchaProperties properties = new CaptchaProperties();
+        properties.setAdaptive(true);
+        properties.setAdaptiveTriggerThreshold(3);
+        captchaService = new CaptchaService(redisTemplate, properties);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("auth:login:fail:ip:127.0.0.1")).thenReturn(2L);
+        when(valueOperations.get("auth:login:fail:id:ALICE@EXAMPLE.COM")).thenReturn(0L);
+
+        assertFalse(captchaService.isCaptchaRequired("127.0.0.1", "alice@example.com"));
     }
 }

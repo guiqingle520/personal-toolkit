@@ -78,6 +78,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiErrorResponse> handleApiException(ApiException ex,
+                                                               HttpServletRequest request) {
+        ApiErrorResponse response = ApiErrorResponse.of(
+                ex.getCode(),
+                ex.getMessage(),
+                ex.getStatusCode().value(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(ex.getStatusCode()).body(response);
+    }
+
     /**
      * 处理业务流程中主动抛出的 ResponseStatusException，保留原始状态码和原因。
      *

@@ -1,13 +1,16 @@
 package com.personal.toolkit.auth.controller;
 
 import com.personal.toolkit.auth.dto.AuthLoginRequest;
+import com.personal.toolkit.auth.dto.AuthLoginPolicyResponse;
 import com.personal.toolkit.auth.dto.AuthRegisterRequest;
 import com.personal.toolkit.auth.dto.AuthTokenResponse;
 import com.personal.toolkit.auth.dto.CaptchaResponse;
+import com.personal.toolkit.auth.service.AuthAuditService;
 import com.personal.toolkit.auth.dto.UserProfileResponse;
 import com.personal.toolkit.auth.service.AuthService;
 import com.personal.toolkit.auth.service.CaptchaService;
 import com.personal.toolkit.common.api.ApiResponse;
+import com.personal.toolkit.common.exception.ApiException;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -28,10 +31,14 @@ public class AuthController {
 
     private final AuthService authService;
     private final CaptchaService captchaService;
+    private final AuthAuditService authAuditService;
 
-    public AuthController(AuthService authService, CaptchaService captchaService) {
+    public AuthController(AuthService authService,
+                          CaptchaService captchaService,
+                          AuthAuditService authAuditService) {
         this.authService = authService;
         this.captchaService = captchaService;
+        this.authAuditService = authAuditService;
     }
 
     /**
@@ -42,7 +49,19 @@ public class AuthController {
     @GetMapping("/captcha")
     public ResponseEntity<ApiResponse<CaptchaResponse>> captcha(HttpServletRequest servletRequest) {
         String clientIp = extractClientIp(servletRequest);
-        return ResponseEntity.ok(ApiResponse.success("Captcha generated successfully", captchaService.issueCaptcha(clientIp)));
+        CaptchaResponse response = captchaService.issueCaptcha(clientIp);
+        authAuditService.captchaIssued(clientIp);
+        return ResponseEntity.ok(ApiResponse.success("Captcha generated successfully", response));
+    }
+
+    @GetMapping("/login-policy")
+    public ResponseEntity<ApiResponse<AuthLoginPolicyResponse>> loginPolicy() {
+        AuthLoginPolicyResponse response = new AuthLoginPolicyResponse(
+                captchaService.isCaptchaEnabled(),
+                captchaService.isAdaptiveCaptchaEnabled(),
+                captchaService.getAdaptiveTriggerThreshold()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Login policy fetched successfully", response));
     }
 
     /**
@@ -68,14 +87,26 @@ public class AuthController {
                                                                 HttpServletRequest servletRequest) {
         String clientIp = extractClientIp(servletRequest);
         captchaService.enforceLoginThrottle(clientIp, request.getUsername());
-        captchaService.validateCaptcha(request.getCaptchaId(), request.getCaptchaCode());
+        try {
+            captchaService.validateCaptchaIfNeeded(clientIp, request.getUsername(), request.getCaptchaId(), request.getCaptchaCode());
+        } catch (ApiException ex) {
+            if ("CAPTCHA_REQUIRED".equals(ex.getCode())) {
+                authAuditService.captchaRejected(clientIp, ex.getMessage());
+            }
+            throw ex;
+        } catch (ResponseStatusException ex) {
+            authAuditService.captchaRejected(clientIp, ex.getReason());
+            throw ex;
+        }
         try {
             AuthTokenResponse response = authService.login(request);
             captchaService.clearLoginFailure(clientIp, request.getUsername());
+            authAuditService.loginSucceeded(clientIp, request.getUsername());
             return ResponseEntity.ok(ApiResponse.success("Login successful", response));
         } catch (ResponseStatusException ex) {
             if (ex.getStatusCode().value() == HttpStatus.UNAUTHORIZED.value()) {
                 captchaService.recordLoginFailure(clientIp, request.getUsername());
+                authAuditService.loginFailed(clientIp, request.getUsername(), ex.getReason());
             }
             throw ex;
         }

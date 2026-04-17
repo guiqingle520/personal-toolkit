@@ -10,18 +10,21 @@ import java.util.Map;
 public class ApiErrorResponse {
 
     private final boolean success;
+    private final String code;
     private final String message;
     private final int status;
     private final String path;
     private final Map<String, List<String>> validation;
     private final OffsetDateTime timestamp;
 
-    private ApiErrorResponse(String message,
+    private ApiErrorResponse(String code,
+                             String message,
                              int status,
                              String path,
                              Map<String, List<String>> validation,
                              OffsetDateTime timestamp) {
         this.success = false;
+        this.code = code;
         this.message = message;
         this.status = status;
         this.path = path;
@@ -38,7 +41,11 @@ public class ApiErrorResponse {
      * @return 统一错误响应体
      */
     public static ApiErrorResponse of(String message, int status, String path) {
-        return new ApiErrorResponse(message, status, path, Map.of(), OffsetDateTime.now());
+        return new ApiErrorResponse(null, message, status, path, Map.of(), OffsetDateTime.now());
+    }
+
+    public static ApiErrorResponse of(String code, String message, int status, String path) {
+        return new ApiErrorResponse(code, message, status, path, Map.of(), OffsetDateTime.now());
     }
 
     /**
@@ -54,7 +61,7 @@ public class ApiErrorResponse {
                                       int status,
                                       String path,
                                       Map<String, List<String>> validation) {
-        return new ApiErrorResponse(message, status, path, validation, OffsetDateTime.now());
+        return new ApiErrorResponse(null, message, status, path, validation, OffsetDateTime.now());
     }
 
     /**
@@ -64,6 +71,10 @@ public class ApiErrorResponse {
      */
     public boolean isSuccess() {
         return success;
+    }
+
+    public String getCode() {
+        return code;
     }
 
     /**

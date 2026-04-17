@@ -3,6 +3,7 @@ package com.personal.toolkit.auth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personal.toolkit.auth.config.SecurityConfig;
 import com.personal.toolkit.auth.dto.AuthLoginRequest;
+import com.personal.toolkit.auth.service.AuthAuditService;
 import com.personal.toolkit.auth.dto.AuthRegisterRequest;
 import com.personal.toolkit.auth.dto.AuthTokenResponse;
 import com.personal.toolkit.auth.dto.CaptchaResponse;
@@ -13,6 +14,7 @@ import com.personal.toolkit.auth.security.JwtTokenService;
 import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
 import com.personal.toolkit.auth.service.AuthService;
 import com.personal.toolkit.auth.service.CaptchaService;
+import com.personal.toolkit.common.exception.ApiException;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,6 +60,9 @@ class AuthControllerTest {
 
     @MockBean
     private CaptchaService captchaService;
+
+    @MockBean
+    private AuthAuditService authAuditService;
 
     @MockBean
     private JwtTokenService jwtTokenService;
@@ -124,6 +132,21 @@ class AuthControllerTest {
         verify(captchaService).issueCaptcha("127.0.0.1");
     }
 
+    @Test
+    void loginPolicyShouldReturnCaptchaFlags() throws Exception {
+        when(captchaService.isCaptchaEnabled()).thenReturn(true);
+        when(captchaService.isAdaptiveCaptchaEnabled()).thenReturn(true);
+        when(captchaService.getAdaptiveTriggerThreshold()).thenReturn(2);
+
+        mockMvc.perform(get("/api/auth/login-policy"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Login policy fetched successfully"))
+                .andExpect(jsonPath("$.data.captchaEnabled").value(true))
+                .andExpect(jsonPath("$.data.adaptiveCaptcha").value(true))
+                .andExpect(jsonPath("$.data.adaptiveTriggerThreshold").value(2));
+    }
+
     /**
      * me 接口在未认证时应返回统一 401 错误响应。
      */
@@ -182,6 +205,25 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Invalid username or password"));
+    }
+
+    @Test
+    void loginShouldReturnCaptchaRequiredCode() throws Exception {
+        AuthLoginRequest request = new AuthLoginRequest();
+        request.setUsername("alice");
+        request.setPassword("password123");
+
+        doThrow(new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "CAPTCHA_REQUIRED", "Captcha required before login"))
+                .when(captchaService)
+                .validateCaptchaIfNeeded(eq("127.0.0.1"), eq("alice"), isNull(), isNull());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("CAPTCHA_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("Captcha required before login"));
     }
 
     private AuthTokenResponse authTokenResponse() {

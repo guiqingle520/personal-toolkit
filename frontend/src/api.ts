@@ -8,7 +8,9 @@ export interface ApiResponse<T = void> {
 }
 
 export interface ApiError {
+  code?: string
   message: string
+  status?: number
   validation?: Record<string, string[]>
 }
 
@@ -48,7 +50,9 @@ export async function fetchApi<T>(url: string, options?: RequestInit, t?: (key: 
   if (!res.ok) {
     const errorMsg = data?.message || (t ? t('feedback.httpError', { status: res.status }) : `HTTP Error ${res.status}`)
     throw new Error(JSON.stringify({
+      code: data?.code,
       message: errorMsg,
+      status: data?.status ?? res.status,
       validation: data?.validation
     }))
   }

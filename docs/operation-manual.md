@@ -24,6 +24,8 @@
 ### 核心特性
 
 - ✅ JWT 登录 / 注册 / 退出
+- ✅ 登录随机验证码（SVG）
+- ✅ 登录失败按 IP / 账号标识限流
 - ✅ Todo 数据按账号隔离
 - ✅ 完整的 CRUD 操作（创建、查询、更新、删除）
 - ✅ 任务状态管理（待处理/已完成）
@@ -313,8 +315,28 @@ npm run dev
    - 邮箱
    - 密码（8~100 位）
 3. 注册成功后，前端会自动进入已登录态
-4. 后续登录时可使用**用户名或邮箱**配合密码，所有 Todo 请求会自动带上 JWT Token
+4. 后续登录时可使用**用户名或邮箱**配合密码，并输入当前随机验证码
 5. 顶部工具栏可执行退出操作，退出后将清除本地登录态
+
+#### 4.1 登录验证码流程
+
+登录页会自动请求 `GET /api/auth/captcha` 获取验证码图片与 `captchaId`。
+
+用户登录时需要提交：
+
+- 用户名或邮箱
+- 密码
+- 验证码答案
+- 当前验证码对应的 `captchaId`
+
+验证码策略：
+
+- 验证码有效期：120 秒
+- 单个验证码最多尝试：3 次
+- 登录失败过多会触发限流
+- 验证码刷新过快会触发限流
+
+当登录失败（400/401/429）时，前端会自动刷新验证码。
 
 #### 5. 访问应用
 
@@ -472,10 +494,52 @@ docker compose down -v
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| GET | `/api/auth/login-policy` | 获取登录页验证码策略（固定验证码或自适应验证码） |
+| GET | `/api/auth/captcha` | 获取登录验证码（返回 captchaId、图片和过期时间） |
 | POST | `/api/auth/register` | 注册账号并返回 JWT 与当前用户信息 |
-| POST | `/api/auth/login` | 支持用户名或邮箱登录，并返回 JWT 与当前用户信息 |
+| POST | `/api/auth/login` | 支持用户名或邮箱登录；固定模式要求验证码，自适应模式按风险要求验证码 |
 | GET | `/api/auth/me` | 获取当前登录用户信息 |
 | POST | `/api/auth/logout` | 退出当前登录态（前端清理 Token） |
+
+### 登录策略接口返回
+
+```json
+{
+  "success": true,
+  "message": "Login policy fetched successfully",
+  "data": {
+    "captchaEnabled": true,
+    "adaptiveCaptcha": false,
+    "adaptiveTriggerThreshold": 2
+  },
+  "timestamp": "2026-04-17T10:00:00Z"
+}
+```
+
+### 登录接口请求体
+
+```json
+{
+  "username": "alice@example.com",
+  "password": "password123",
+  "captchaId": "<captcha-id>",
+  "captchaCode": "AB12C"
+}
+```
+
+### 登录常见错误
+
+- `400 CAPTCHA_REQUIRED`
+- `400 Captcha expired or invalid`
+- `400 Captcha verification failed`
+- `401 Invalid username or password`
+- `429 Too many captcha requests, please try again later`
+- `429 Too many failed login attempts, please try again later`
+
+### 登录模式说明
+
+- 固定验证码模式：登录页进入后先请求 `/api/auth/captcha`，再提交登录请求。
+- 自适应验证码模式：登录页进入后先请求 `/api/auth/login-policy`；默认连续失败达到 2 次后，服务端开始要求验证码。收到 `CAPTCHA_REQUIRED` 后，再请求 `/api/auth/captcha` 并补交验证码。
 
 ### Todo 接口认证要求
 
