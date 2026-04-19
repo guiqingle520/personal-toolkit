@@ -37,7 +37,9 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -107,7 +109,7 @@ class TodoControllerTest {
      */
     @Test
     void getStatsOverviewShouldReturnOverviewPayload() throws Exception {
-        when(todoService.getStatsOverview()).thenReturn(new TodoStatsOverviewResponse(2, 7, 3, 11));
+        when(todoService.getStatsOverview()).thenReturn(new TodoStatsOverviewResponse(2, 7, 3, 11, 5));
 
         mockMvc.perform(get("/api/todos/stats/overview"))
                 .andExpect(status().isOk())
@@ -116,7 +118,8 @@ class TodoControllerTest {
                 .andExpect(jsonPath("$.data.todayCompleted").value(2))
                 .andExpect(jsonPath("$.data.weekCompleted").value(7))
                 .andExpect(jsonPath("$.data.overdueCount").value(3))
-                .andExpect(jsonPath("$.data.activeCount").value(11));
+                .andExpect(jsonPath("$.data.activeCount").value(11))
+                .andExpect(jsonPath("$.data.upcomingReminderCount").value(5));
     }
 
     /**
@@ -190,6 +193,32 @@ class TodoControllerTest {
     }
 
     /**
+     * 过滤接口应接收新的 recurrenceType 和 timePreset 查询参数。
+     */
+    @Test
+    void findAllShouldBindRecurrenceAndTimePresetFilters() throws Exception {
+        PageResponse<TodoItem> pageResponse = PageResponse.from(new PageImpl<>(
+                List.of(createTodo(1L, "PENDING")),
+                PageRequest.of(0, 10, Sort.by("createTime")),
+                1
+        ));
+        when(todoService.findAll(any(), eq(0), eq(10), any(Sort.class))).thenReturn(pageResponse);
+
+        mockMvc.perform(get("/api/todos")
+                        .param("recurrenceType", "DAILY")
+                        .param("timePreset", "OVERDUE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(todoService).findAll(
+                argThat(query -> "DAILY".equals(query.getRecurrenceType()) && "OVERDUE".equals(query.getTimePreset())),
+                eq(0),
+                eq(10),
+                any(Sort.class)
+        );
+    }
+
+    /**
      * 详情接口应返回前端编辑和状态切换所需字段。
      */
     @Test
@@ -207,6 +236,7 @@ class TodoControllerTest {
                 .andExpect(jsonPath("$.data.id").value(3L))
                 .andExpect(jsonPath("$.data.status").value("DONE"))
                 .andExpect(jsonPath("$.data.category").value("Work"))
+                .andExpect(jsonPath("$.data.remindAt").value("2026-04-08T07:30:00"))
                 .andExpect(jsonPath("$.data.recurrenceType").value("DAILY"))
                 .andExpect(jsonPath("$.data.subItemSummary.completedCount").value(2))
                 .andExpect(jsonPath("$.data.tags").value("backend,urgent"));
@@ -275,6 +305,12 @@ class TodoControllerTest {
         request.setStatus("PENDING");
         request.setPriority(3);
         request.setDueDate(java.time.LocalDateTime.of(2026, 4, 10, 9, 0));
+        request.setRemindAt(java.time.LocalDateTime.of(2026, 4, 10, 8, 30));
+        request.setNotes("Create API notes");
+        request.setAttachmentLinks("https://example.com/spec");
+        request.setOwnerLabel("Alice");
+        request.setCollaborators("Bob,Carol");
+        request.setWatchers("Dave");
         request.setRecurrenceType("DAILY");
         request.setRecurrenceInterval(1);
 
@@ -302,6 +338,12 @@ class TodoControllerTest {
         request.setStatus("DONE");
         request.setPriority(4);
         request.setDueDate(java.time.LocalDateTime.of(2026, 4, 12, 9, 0));
+        request.setRemindAt(java.time.LocalDateTime.of(2026, 4, 12, 8, 30));
+        request.setNotes("Update API notes");
+        request.setAttachmentLinks("https://example.com/design");
+        request.setOwnerLabel("Alice");
+        request.setCollaborators("Bob");
+        request.setWatchers("Carol");
         request.setRecurrenceType("WEEKLY");
         request.setRecurrenceInterval(1);
 
@@ -410,6 +452,13 @@ class TodoControllerTest {
         todo.setTitle("Todo-" + id);
         todo.setStatus(status);
         todo.setPriority(3);
+        todo.setDueDate(java.time.LocalDateTime.of(2026, 4, 10, 9, 0));
+        todo.setRemindAt(java.time.LocalDateTime.of(2026, 4, 8, 7, 30));
+        todo.setNotes("Review notes");
+        todo.setAttachmentLinks("https://example.com/attachment");
+        todo.setOwnerLabel("Alice");
+        todo.setCollaborators("Bob,Carol");
+        todo.setWatchers("Dave");
         todo.setRecurrenceType(id == 11L ? "WEEKLY" : "DAILY");
         todo.setRecurrenceInterval(1);
         todo.setNextTriggerTime(java.time.LocalDateTime.of(2026, 4, 10, 9, 0));

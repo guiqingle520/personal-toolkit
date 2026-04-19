@@ -28,6 +28,7 @@ defineEmits<{
     </div>
     <div class="create-row">
       <LocalizedDateInput :modelValue="newTodo.dueDate" class="cyber-input" :disabled="submitting" @update:modelValue="$emit('update:newTodo', { ...newTodo, dueDate: $event })" />
+      <LocalizedDateInput :modelValue="newTodo.remindAt" :placeholder="$t('reminder.remindAt')" class="cyber-input" :disabled="submitting" @update:modelValue="$emit('update:newTodo', { ...newTodo, remindAt: $event })" />
       <input :value="newTodo.tags" type="text" :placeholder="$t('form.tagsCsv')" class="cyber-input flex-2" :list="tagListId" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, tags: ($event.target as HTMLInputElement).value })" @keyup.enter="$emit('createTodo')" />
       <select :value="newTodo.recurrenceType || ''" class="cyber-input" :disabled="submitting" @change="$emit('update:newTodo', { ...newTodo, recurrenceType: ($event.target as HTMLSelectElement).value || undefined })">
         <option value="">{{ $t('recurrence.none') }}</option>
@@ -40,6 +41,15 @@ defineEmits<{
       <button class="btn btn-primary" :disabled="submitting || !newTodo.title.trim()" @click="$emit('createTodo')">
         {{ $t('form.addTask') }}
       </button>
+    </div>
+    <div class="create-row">
+      <textarea :value="newTodo.notes" :placeholder="$t('form.notes')" class="cyber-input flex-2 todo-notes-input" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, notes: ($event.target as HTMLTextAreaElement).value })" />
+      <textarea :value="newTodo.attachmentLinks" :placeholder="$t('form.attachmentLinks')" class="cyber-input flex-2 todo-notes-input" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, attachmentLinks: ($event.target as HTMLTextAreaElement).value })" />
+    </div>
+    <div class="create-row">
+      <input :value="newTodo.ownerLabel" type="text" :placeholder="$t('form.ownerLabel')" class="cyber-input" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, ownerLabel: ($event.target as HTMLInputElement).value })" />
+      <input :value="newTodo.collaborators" type="text" :placeholder="$t('form.collaborators')" class="cyber-input flex-2" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, collaborators: ($event.target as HTMLInputElement).value })" />
+      <input :value="newTodo.watchers" type="text" :placeholder="$t('form.watchers')" class="cyber-input flex-2" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, watchers: ($event.target as HTMLInputElement).value })" />
     </div>
   </div>
 </template>

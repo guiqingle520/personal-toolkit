@@ -29,13 +29,33 @@ const en = {
     pending: 'Pending',
     done: 'Done',
     allPriorities: 'All Priorities',
+    allRecurrence: 'All Recurrence',
     category: 'Category',
     tag: 'Tag',
+    presetToday: 'Due Today',
+    presetOverdue: 'Overdue',
+    presetUpcoming: 'Upcoming Reminder',
+    statusChip: 'Status: {value}',
+    priorityChip: 'Priority: {value}',
+    categoryChip: 'Category: {value}',
+    tagChip: 'Tag: {value}',
+    recurrenceChip: 'Repeat: {value}',
+    presetChip: 'Preset: {value}',
+    dueFromChip: 'Due From: {value}',
+    dueToChip: 'Due To: {value}',
+    remindFromChip: 'Reminder From: {value}',
+    remindToChip: 'Reminder To: {value}',
     reset: 'Reset'
   },
   form: {
     whatNeedsToBeDone: 'What needs to be done?',
     tagsCsv: 'Tags (comma separated)',
+    notes: 'Notes',
+    attachmentLinks: 'Attachment links (one per line)',
+    attachmentLink: 'Open attachment',
+    ownerLabel: 'Owner Label',
+    collaborators: 'Collaborators (comma separated)',
+    watchers: 'Watchers (comma separated)',
     addTask: 'Add Task',
     addSubtask: 'Add Subtask',
     title: 'Title',
@@ -103,12 +123,24 @@ const en = {
     nextTrigger: 'Scheduled: {time}',
     completedAt: 'Completed: {time}'
   },
+  reminder: {
+    remindAt: 'Reminder Date',
+    remindFrom: 'Reminder From',
+    remindTo: 'Reminder To',
+    scheduledAt: 'Reminder: {time}'
+  },
+  collaboration: {
+    ownerLabel: 'Owner: {value}',
+    collaboratorsLabel: 'Collaborators: {value}',
+    watchersLabel: 'Watchers: {value}'
+  },
   stats: {
     panelTitle: 'Stats Panel',
     todayCompleted: 'Today Completed',
     weekCompleted: 'Week Completed',
     overdueCount: 'Overdue Tasks',
     activeCount: 'Active Tasks',
+    upcomingReminderCount: 'Upcoming Reminders',
     categoryStats: 'Category Stats',
     trend7d: '7-Day Trend',
     uncategorized: 'Uncategorized',
@@ -120,7 +152,8 @@ const en = {
   kanban: {
     pendingColumn: 'Pending',
     doneColumn: 'Done',
-    emptyColumn: 'No tasks in this column'
+    emptyColumn: 'No tasks in this column',
+    dropHere: 'Drop task here'
   },
   auth: {
     loginTitle: 'Access Terminal',

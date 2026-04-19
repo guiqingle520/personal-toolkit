@@ -29,13 +29,33 @@ const zhCN = {
     pending: '待办',
     done: '已完成',
     allPriorities: '所有优先级',
+    allRecurrence: '所有重复',
     category: '分类',
     tag: '标签',
+    presetToday: '今日到期',
+    presetOverdue: '逾期任务',
+    presetUpcoming: '即将提醒',
+    statusChip: '状态：{value}',
+    priorityChip: '优先级：{value}',
+    categoryChip: '分类：{value}',
+    tagChip: '标签：{value}',
+    recurrenceChip: '重复：{value}',
+    presetChip: '预设：{value}',
+    dueFromChip: '截止开始：{value}',
+    dueToChip: '截止结束：{value}',
+    remindFromChip: '提醒开始：{value}',
+    remindToChip: '提醒结束：{value}',
     reset: '重置'
   },
   form: {
     whatNeedsToBeDone: '需要完成什么？',
     tagsCsv: '标签（逗号分隔）',
+    notes: '备注',
+    attachmentLinks: '附件链接（每行一个）',
+    attachmentLink: '打开附件',
+    ownerLabel: '负责人显示名',
+    collaborators: '协作人（逗号分隔）',
+    watchers: '观察者（逗号分隔）',
     addTask: '添加任务',
     addSubtask: '添加子任务',
     title: '标题',
@@ -103,12 +123,24 @@ const zhCN = {
     nextTrigger: '计划触发：{time}',
     completedAt: '完成于：{time}'
   },
+  reminder: {
+    remindAt: '提醒日期',
+    remindFrom: '提醒开始',
+    remindTo: '提醒结束',
+    scheduledAt: '提醒：{time}'
+  },
+  collaboration: {
+    ownerLabel: '负责人：{value}',
+    collaboratorsLabel: '协作人：{value}',
+    watchersLabel: '观察者：{value}'
+  },
   stats: {
     panelTitle: '统计面板',
     todayCompleted: '今日完成',
     weekCompleted: '本周完成',
     overdueCount: '逾期任务',
     activeCount: '活动任务',
+    upcomingReminderCount: '即将提醒',
     categoryStats: '分类统计',
     trend7d: '7日趋势',
     uncategorized: '未分类',
@@ -120,7 +152,8 @@ const zhCN = {
   kanban: {
     pendingColumn: '待办',
     doneColumn: '已完成',
-    emptyColumn: '此列暂无任务'
+    emptyColumn: '此列暂无任务',
+    dropHere: '拖到这里'
   },
   auth: {
     loginTitle: '系统登录',

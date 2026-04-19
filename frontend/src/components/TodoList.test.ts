@@ -19,8 +19,14 @@ function createPageResponse() {
           status: 'PENDING',
           priority: 3,
           dueDate: '2026-04-08',
+          remindAt: '2026-04-08T07:30:00',
           category: 'Work',
           tags: 'backend',
+          notes: 'Draft release notes',
+          attachmentLinks: 'https://example.com/spec',
+          ownerLabel: 'Alice',
+          collaborators: 'Bob,Carol',
+          watchers: 'Dave',
           recurrenceType: 'DAILY',
           recurrenceInterval: 1,
           recurrenceEndTime: '2026-05-08T00:00:00',
@@ -85,12 +91,13 @@ function createSuccessResponse(data) {
 }
 
 function createStatsOverviewResponse() {
-  return createSuccessResponse({
-    todayCompleted: 2,
-    weekCompleted: 7,
-    overdueCount: 3,
-    activeCount: 11,
-  })
+    return createSuccessResponse({
+      todayCompleted: 2,
+      weekCompleted: 7,
+      overdueCount: 3,
+      activeCount: 11,
+      upcomingReminderCount: 5,
+    })
 }
 
 function createStatsCategoryResponse() {
@@ -142,6 +149,8 @@ function getFilterControls(wrapper) {
     search: filterSection.findAll('input')[0],
     status: filterSection.findAll('select')[0],
     priority: filterSection.findAll('select')[1],
+    recurrence: filterSection.findAll('select')[2],
+    presetButton: filterSection.findAll('.filter-preset-btn')[0],
     dueDateFrom: filterSection.findAll('.localized-date-input-wrapper input')[0],
     resetButton: filterSection.find('button.btn-ghost'),
   }
@@ -198,11 +207,33 @@ describe('TodoList reset behavior', () => {
       category: '',
       keyword: '',
       tag: '',
+      recurrenceType: '',
+      timePreset: '',
       dueDateFrom: '',
       dueDateTo: '',
+      remindDateFrom: '',
+      remindDateTo: '',
       sortBy: 'createTime',
       sortDir: 'DESC',
     })
+  })
+
+  it('sends preset and recurrence filters in list query', async () => {
+    const wrapper = await mountTodoList()
+
+    const controls = getFilterControls(wrapper)
+    await controls.recurrence.setValue('DAILY')
+    await controls.presetButton.trigger('click')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos?page=0&size=10&recurrenceType=DAILY&timePreset=DUE_TODAY&sortBy=createTime&sortDir=DESC',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
   })
 
   it('clears selection and forces page zero when child filter updates arrive', async () => {
@@ -279,6 +310,7 @@ describe('TodoList reset behavior', () => {
     expect(wrapper.text()).toContain('Week Completed')
     expect(wrapper.text()).toContain('Overdue Tasks')
     expect(wrapper.text()).toContain('Active Tasks')
+    expect(wrapper.text()).toContain('Upcoming Reminders')
     expect(wrapper.text()).toContain('Uncategorized')
     expect(wrapper.text()).toContain('7-Day Trend')
   })
@@ -326,6 +358,51 @@ describe('TodoList reset behavior', () => {
     expect(wrapper.text()).not.toContain('Kanban View')
   })
 
+  it('updates todo status when kanban moves a task to another column', async () => {
+    const wrapper = await mountTodoList()
+
+    const toolbarButtons = wrapper.findAll('.view-toggle-bar button')
+    const kanbanButton = toolbarButtons.find((button) => button.text().includes('Kanban View'))
+    await kanbanButton!.trigger('click')
+    await flushPromises()
+
+    await (wrapper.vm as unknown as { moveTodoToStatus: (todo: unknown, status: 'PENDING' | 'DONE') => Promise<void> }).moveTodoToStatus(createPageResponse().data.content[0], 'DONE')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos/1',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          id: 1,
+          title: 'Alpha',
+          status: 'DONE',
+          priority: 3,
+          dueDate: '2026-04-08',
+          remindAt: '2026-04-08T07:30:00',
+          category: 'Work',
+          tags: 'backend',
+          notes: 'Draft release notes',
+          attachmentLinks: 'https://example.com/spec',
+          ownerLabel: 'Alice',
+          collaborators: 'Bob,Carol',
+          watchers: 'Dave',
+          recurrenceType: 'DAILY',
+          recurrenceInterval: 1,
+          recurrenceEndTime: '2026-05-08T00:00:00',
+          nextTriggerTime: '2026-04-09T09:00:00',
+          subItemSummary: {
+            totalCount: 2,
+            completedCount: 1,
+            progressPercent: 50,
+          },
+          createTime: '2026-04-07T08:00:00',
+          updateTime: '2026-04-07T08:00:00',
+        }),
+      }),
+    )
+  })
+
   it('syncs document lang when locale changes so native date inputs can follow app locale', async () => {
     document.documentElement.lang = 'zh-CN'
 
@@ -340,14 +417,21 @@ describe('TodoList reset behavior', () => {
     const titleInput = createRows[0].find('input[type="text"]')
     const prioritySelect = createRows[0].find('select')
     const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
+    const remindAtInput = createRows[1].findAll('.localized-date-input-wrapper input')[1]
     const tagsInput = createRows[1].findAll('input[type="text"]')[0]
     const addButton = createRows[1].find('button.btn-primary')
+    const notesInput = createRows[2].findAll('textarea')[0]
+    const attachmentLinksInput = createRows[2].findAll('textarea')[1]
 
     await titleInput.setValue('Ship contract tests')
     await prioritySelect.setValue('4')
     await dueDateInput.setValue('2026-04-10')
     await dueDateInput.trigger('blur')
+    await remindAtInput.setValue('2026-04-09')
+    await remindAtInput.trigger('blur')
     await tagsInput.setValue('qa,api')
+    await notesInput.setValue('Document regression notes')
+    await attachmentLinksInput.setValue('https://example.com/spec')
     await addButton.trigger('click')
     await flushPromises()
 
@@ -361,7 +445,13 @@ describe('TodoList reset behavior', () => {
           priority: 4,
           category: '',
           dueDate: '2026-04-10T00:00:00',
+          remindAt: '2026-04-09T00:00:00',
           tags: 'qa,api',
+          notes: 'Document regression notes',
+          attachmentLinks: 'https://example.com/spec',
+          ownerLabel: '',
+          collaborators: '',
+          watchers: '',
         }),
       }),
     )
@@ -373,14 +463,17 @@ describe('TodoList reset behavior', () => {
     const titleInput = createRows[0].find('input[type="text"]')
     const recurrenceSelect = createRows[1].find('select')
     const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
+    const remindAtInput = createRows[1].findAll('.localized-date-input-wrapper input')[1]
 
     await titleInput.setValue('Daily standup')
     await dueDateInput.setValue('2026-04-10')
     await dueDateInput.trigger('blur')
+    await remindAtInput.setValue('2026-04-09')
+    await remindAtInput.trigger('blur')
     await recurrenceSelect.setValue('DAILY')
     await createRows[1].findAll('input[type="number"]')[0].setValue('2')
-    await createRows[1].findAll('.localized-date-input-wrapper input')[1].setValue('2026-05-10')
-    await createRows[1].findAll('.localized-date-input-wrapper input')[1].trigger('blur')
+    await createRows[1].findAll('.localized-date-input-wrapper input')[2].setValue('2026-05-10')
+    await createRows[1].findAll('.localized-date-input-wrapper input')[2].trigger('blur')
     await createRows[1].find('button.btn-primary').trigger('click')
     await flushPromises()
 
@@ -394,7 +487,13 @@ describe('TodoList reset behavior', () => {
           priority: 3,
           category: '',
           dueDate: '2026-04-10T00:00:00',
+          remindAt: '2026-04-09T00:00:00',
           tags: '',
+          notes: '',
+          attachmentLinks: '',
+          ownerLabel: '',
+          collaborators: '',
+          watchers: '',
           recurrenceType: 'DAILY',
           recurrenceInterval: 2,
           recurrenceEndTime: '2026-05-10T00:00:00',
@@ -419,8 +518,14 @@ describe('TodoList reset behavior', () => {
           status: 'DONE',
           priority: 3,
           dueDate: '2026-04-08',
+          remindAt: '2026-04-08T07:30:00',
           category: 'Work',
           tags: 'backend',
+          notes: 'Draft release notes',
+          attachmentLinks: 'https://example.com/spec',
+          ownerLabel: 'Alice',
+          collaborators: 'Bob,Carol',
+          watchers: 'Dave',
           recurrenceType: 'DAILY',
           recurrenceInterval: 1,
           recurrenceEndTime: '2026-05-08T00:00:00',

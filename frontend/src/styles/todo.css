@@ -127,6 +127,42 @@
   align-items: center;
 }
 
+.filter-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-preset-btn.is-active {
+  border-color: var(--color-primary);
+  background: rgba(56, 189, 248, 0.14);
+  color: var(--color-text-white);
+}
+
+.filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.filter-chip {
+  border: 1px solid var(--color-border-subtle);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-bright);
+  border-radius: var(--radius-full);
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.filter-chip:hover {
+  border-color: var(--color-primary);
+  background: rgba(56, 189, 248, 0.12);
+}
+
 .options-panel {
   margin-bottom: 24px;
 }
@@ -324,6 +360,11 @@
   gap: 10px;
 }
 
+.todo-notes-input {
+  min-height: 92px;
+  resize: vertical;
+}
+
 .todo-title {
   font-size: 1.15rem;
   font-weight: 600;
@@ -351,6 +392,23 @@
   font-family: ui-monospace, monospace;
   font-size: 0.75rem;
   opacity: 0.7;
+}
+
+.todo-notes-preview {
+  margin: 0;
+  color: var(--color-text-bright);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.todo-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.todo-attachment-link {
+  text-decoration: none;
 }
 
 /* --- Checklist --- */
@@ -568,6 +626,13 @@
   padding: 20px;
   display: flex;
   flex-direction: column;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kanban-column.is-drag-over {
+  border-color: var(--color-primary);
+  background: rgba(34, 211, 238, 0.08);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.15) inset;
 }
 
 .kanban-column-header {
@@ -595,6 +660,15 @@
   flex-direction: column;
   gap: 16px;
   flex: 1;
+}
+
+.kanban-card-shell {
+  list-style: none;
+  cursor: grab;
+}
+
+.kanban-card-shell.is-dragging {
+  opacity: 0.45;
 }
 
 .kanban-empty-state {

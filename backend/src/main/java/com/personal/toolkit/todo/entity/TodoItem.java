@@ -48,11 +48,29 @@ public class TodoItem {
     @Column(name = "due_date")
     private LocalDateTime dueDate;
 
+    @Column(name = "remind_at")
+    private LocalDateTime remindAt;
+
     @Column(length = 100)
     private String category;
 
     @Column(length = 500)
     private String tags;
+
+    @Column(length = 2000)
+    private String notes;
+
+    @Column(name = "attachment_links", length = 2000)
+    private String attachmentLinks;
+
+    @Column(name = "owner_label", length = 100)
+    private String ownerLabel;
+
+    @Column(length = 1000)
+    private String collaborators;
+
+    @Column(length = 1000)
+    private String watchers;
 
     @Column(name = "recurrence_type", nullable = false, length = 32)
     private String recurrenceType;
@@ -190,6 +208,24 @@ public class TodoItem {
     }
 
     /**
+     * 返回待办事项提醒时间。
+     *
+     * @return 提醒时间
+     */
+    public LocalDateTime getRemindAt() {
+        return remindAt;
+    }
+
+    /**
+     * 设置待办事项提醒时间。
+     *
+     * @param remindAt 提醒时间
+     */
+    public void setRemindAt(LocalDateTime remindAt) {
+        this.remindAt = remindAt;
+    }
+
+    /**
      * 返回待办事项分类。
      *
      * @return 分类名称
@@ -223,6 +259,46 @@ public class TodoItem {
      */
     public void setTags(String tags) {
         this.tags = tags;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    public String getAttachmentLinks() {
+        return attachmentLinks;
+    }
+
+    public void setAttachmentLinks(String attachmentLinks) {
+        this.attachmentLinks = attachmentLinks;
+    }
+
+    public String getOwnerLabel() {
+        return ownerLabel;
+    }
+
+    public void setOwnerLabel(String ownerLabel) {
+        this.ownerLabel = ownerLabel;
+    }
+
+    public String getCollaborators() {
+        return collaborators;
+    }
+
+    public void setCollaborators(String collaborators) {
+        this.collaborators = collaborators;
+    }
+
+    public String getWatchers() {
+        return watchers;
+    }
+
+    public void setWatchers(String watchers) {
+        this.watchers = watchers;
     }
 
     /**

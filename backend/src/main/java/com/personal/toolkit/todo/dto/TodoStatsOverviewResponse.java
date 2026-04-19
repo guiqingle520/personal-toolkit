@@ -9,12 +9,18 @@ public class TodoStatsOverviewResponse {
     private final long weekCompleted;
     private final long overdueCount;
     private final long activeCount;
+    private final long upcomingReminderCount;
 
-    public TodoStatsOverviewResponse(long todayCompleted, long weekCompleted, long overdueCount, long activeCount) {
+    public TodoStatsOverviewResponse(long todayCompleted,
+                                     long weekCompleted,
+                                     long overdueCount,
+                                     long activeCount,
+                                     long upcomingReminderCount) {
         this.todayCompleted = todayCompleted;
         this.weekCompleted = weekCompleted;
         this.overdueCount = overdueCount;
         this.activeCount = activeCount;
+        this.upcomingReminderCount = upcomingReminderCount;
     }
 
     /**
@@ -51,5 +57,14 @@ public class TodoStatsOverviewResponse {
      */
     public long getActiveCount() {
         return activeCount;
+    }
+
+    /**
+     * 返回未来 24 小时内即将触发的提醒数量。
+     *
+     * @return 即将提醒数量
+     */
+    public long getUpcomingReminderCount() {
+        return upcomingReminderCount;
     }
 }

@@ -45,6 +45,10 @@ const maxTrendValue = computed(() => {
         <div class="stat-label">{{ t('stats.activeCount') }}</div>
         <div class="stat-value text-primary">{{ overview.activeCount }}</div>
       </div>
+      <div class="stat-box">
+        <div class="stat-label">{{ t('stats.upcomingReminderCount') }}</div>
+        <div class="stat-value text-info">{{ overview.upcomingReminderCount }}</div>
+      </div>
     </div>
 
     <div class="stats-row">
@@ -127,6 +131,7 @@ const maxTrendValue = computed(() => {
 .text-success { color: var(--success-color, #10b981); }
 .text-warning { color: var(--warning-color, #f59e0b); }
 .text-primary { color: var(--primary-color, #3b82f6); }
+.text-info { color: var(--accent-color, #38bdf8); }
 
 .stats-row {
   display: flex;

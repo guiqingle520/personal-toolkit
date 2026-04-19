@@ -232,7 +232,12 @@ npm run dev
 - 当前用户登录态恢复（前端本地持久化）
 - Todo 数据按账号隔离
 - Todo 基础 CRUD
+- Todo 提醒时间
 - 筛选 / 分页 / 回收站
+- 时间预设筛选（今日到期 / 逾期 / 即将提醒）
+- 重复类型筛选与活动筛选 chips
+- 长备注与附件链接
+- 协作能力预留（负责人 / 协作人 / 观察者占位字段）
 - Checklist / 子任务
 - 重复任务
 - 统计面板
@@ -245,6 +250,9 @@ npm run dev
 - `backend/sql/create_app_user.sql`：用户表初始化脚本
 - `backend/sql/alter_todo_item_add_user_id_phase1.sql`：Todo 账号归属迁移第一阶段脚本
 - `backend/sql/alter_todo_item_add_user_id_phase2.sql`：Todo 账号归属迁移第二阶段脚本
+- `backend/sql/alter_todo_item_phase4_reminder.sql`：Todo 提醒时间字段扩展脚本
+- `backend/sql/alter_todo_item_phase5_notes_attachments.sql`：Todo 备注与附件链接字段扩展脚本
+- `backend/sql/alter_todo_item_phase6_collaboration_placeholders.sql`：Todo 协作占位字段扩展脚本
 - `docs/phase-3-plan-v1.md`：Phase 3 初始规划
 - `docs/phase-3-plan-v2.md`：Phase 3 中期实施版
 - `docs/phase-3-plan-v3.md`：Phase 3 收尾归档版

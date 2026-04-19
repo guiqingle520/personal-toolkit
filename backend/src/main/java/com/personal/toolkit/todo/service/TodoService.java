@@ -56,6 +56,7 @@ public class TodoService {
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
     private static final Set<String> ALLOWED_STATUSES = Set.of("PENDING", "DONE");
     private static final Set<String> ALLOWED_RECURRENCE_TYPES = Set.of("NONE", "DAILY", "WEEKLY", "MONTHLY");
+    private static final Set<String> ALLOWED_TIME_PRESETS = Set.of("DUE_TODAY", "OVERDUE", "UPCOMING_REMINDER");
     private static final String SUPPORTED_TREND_RANGE = "7d";
     private static final String UNCLASSIFIED_CATEGORY_KEY = "__UNCLASSIFIED__";
 
@@ -141,13 +142,15 @@ public class TodoService {
         LocalDateTime endOfToday = today.atTime(23, 59, 59);
         LocalDate startOfWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDateTime startOfWeekTime = startOfWeek.atStartOfDay();
+        LocalDateTime reminderWindowEnd = now.plusHours(24);
 
         long todayCompleted = todoRepository.countByUserIdAndDeletedAtIsNullAndCompletedAtBetween(userId, startOfToday, endOfToday);
         long weekCompleted = todoRepository.countByUserIdAndDeletedAtIsNullAndCompletedAtBetween(userId, startOfWeekTime, endOfToday);
         long overdueCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(userId, "DONE", now);
         long activeCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(userId, "DONE");
+        long upcomingReminderCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndRemindAtBetween(userId, "DONE", now, reminderWindowEnd);
 
-        return new TodoStatsOverviewResponse(todayCompleted, weekCompleted, overdueCount, activeCount);
+        return new TodoStatsOverviewResponse(todayCompleted, weekCompleted, overdueCount, activeCount, upcomingReminderCount);
     }
 
     /**
@@ -462,12 +465,22 @@ public class TodoService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "recurrenceEndTime must be after or equal to dueDate");
         }
 
+        if (request.getRemindAt() != null && request.getDueDate() != null && request.getRemindAt().isAfter(request.getDueDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "remindAt must be before or equal to dueDate");
+        }
+
         todoItem.setTitle(normalizedTitle);
         todoItem.setStatus(normalizedStatus);
         todoItem.setPriority(request.getPriority());
         todoItem.setDueDate(request.getDueDate());
+        todoItem.setRemindAt(request.getRemindAt());
         todoItem.setCategory(normalizeNullableText(request.getCategory()));
         todoItem.setTags(normalizeTags(request.getTags()));
+        todoItem.setNotes(normalizeNullableText(request.getNotes()));
+        todoItem.setAttachmentLinks(normalizeAttachmentLinks(request.getAttachmentLinks()));
+        todoItem.setOwnerLabel(normalizeNullableText(request.getOwnerLabel()));
+        todoItem.setCollaborators(normalizePeopleList(request.getCollaborators()));
+        todoItem.setWatchers(normalizePeopleList(request.getWatchers()));
         todoItem.setRecurrenceType(normalizedRecurrenceType);
         todoItem.setRecurrenceInterval(normalizedRecurrenceInterval);
         todoItem.setRecurrenceEndTime("NONE".equals(normalizedRecurrenceType) ? null : recurrenceEndTime);
@@ -542,8 +555,14 @@ public class TodoService {
         nextTodo.setStatus("PENDING");
         nextTodo.setPriority(completedTodo.getPriority());
         nextTodo.setDueDate(nextTriggerTime);
+        nextTodo.setRemindAt(calculateNextReminderTime(completedTodo, nextTriggerTime));
         nextTodo.setCategory(completedTodo.getCategory());
         nextTodo.setTags(completedTodo.getTags());
+        nextTodo.setNotes(completedTodo.getNotes());
+        nextTodo.setAttachmentLinks(completedTodo.getAttachmentLinks());
+        nextTodo.setOwnerLabel(completedTodo.getOwnerLabel());
+        nextTodo.setCollaborators(completedTodo.getCollaborators());
+        nextTodo.setWatchers(completedTodo.getWatchers());
         nextTodo.setRecurrenceType(completedTodo.getRecurrenceType());
         nextTodo.setRecurrenceInterval(completedTodo.getRecurrenceInterval());
         nextTodo.setRecurrenceEndTime(completedTodo.getRecurrenceEndTime());
@@ -564,12 +583,13 @@ public class TodoService {
             return false;
         }
 
-        return todoRepository.existsByUserIdAndDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
+        return todoRepository.existsByUserIdAndDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndRemindAtAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
                 currentUserProvider.getCurrentUserId(),
                 nextTodo.getTitle(),
                 nextTodo.getStatus(),
                 nextTodo.getPriority(),
                 nextTodo.getDueDate(),
+                nextTodo.getRemindAt(),
                 nextTodo.getCategory(),
                 nextTodo.getTags(),
                 nextTodo.getRecurrenceType(),
@@ -636,6 +656,23 @@ public class TodoService {
             case "MONTHLY" -> currentTriggerTime.plusMonths(interval);
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported recurrenceType: " + recurrenceType);
         };
+    }
+
+    /**
+     * 让重复任务的下一条实例沿用相对当前截止时间的提醒偏移。
+     *
+     * @param completedTodo 已完成的重复任务
+     * @param nextTriggerTime 下一条实例的计划触发时间
+     * @return 下一条实例的提醒时间；若原任务未配置提醒则返回 null
+     */
+    private LocalDateTime calculateNextReminderTime(TodoItem completedTodo, LocalDateTime nextTriggerTime) {
+        if (completedTodo.getRemindAt() == null || nextTriggerTime == null) {
+            return null;
+        }
+
+        LocalDateTime anchor = resolveRecurrenceAnchor(completedTodo);
+        Duration reminderOffset = Duration.between(anchor, completedTodo.getRemindAt());
+        return nextTriggerTime.plus(reminderOffset);
     }
 
     /**
@@ -785,6 +822,9 @@ public class TodoService {
      * @return JPA Specification 查询条件对象
      */
     private Specification<TodoItem> buildSpecification(TodoQueryRequest queryRequest, Long userId) {
+        String normalizedRecurrenceTypeFilter = normalizeOptionalRecurrenceFilter(queryRequest.getRecurrenceType());
+        String normalizedTimePreset = normalizeTimePreset(queryRequest.getTimePreset());
+
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(criteriaBuilder.equal(root.get("user").get("id"), userId));
@@ -821,6 +861,10 @@ public class TodoService {
                 predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("tags")), tag));
             }
 
+            if (normalizedRecurrenceTypeFilter != null) {
+                predicates.add(criteriaBuilder.equal(root.get("recurrenceType"), normalizedRecurrenceTypeFilter));
+            }
+
             if (queryRequest.getDueDateFrom() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(
                         root.get("dueDate"),
@@ -835,6 +879,42 @@ public class TodoService {
                 ));
             }
 
+            if (queryRequest.getRemindDateFrom() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        root.get("remindAt"),
+                        queryRequest.getRemindDateFrom().atStartOfDay()
+                ));
+            }
+
+            if (queryRequest.getRemindDateTo() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(
+                        root.get("remindAt"),
+                        queryRequest.getRemindDateTo().atTime(23, 59, 59)
+                ));
+            }
+
+            if (normalizedTimePreset != null) {
+                LocalDateTime now = LocalDateTime.now();
+                switch (normalizedTimePreset) {
+                    case "DUE_TODAY" -> {
+                        predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("dueDate"), LocalDate.now().atStartOfDay()));
+                        predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("dueDate"), LocalDate.now().atTime(23, 59, 59)));
+                    }
+                    case "OVERDUE" -> {
+                        predicates.add(criteriaBuilder.notEqual(root.get("status"), "DONE"));
+                        predicates.add(criteriaBuilder.isNotNull(root.get("dueDate")));
+                        predicates.add(criteriaBuilder.lessThan(root.get("dueDate"), now));
+                    }
+                    case "UPCOMING_REMINDER" -> {
+                        predicates.add(criteriaBuilder.notEqual(root.get("status"), "DONE"));
+                        predicates.add(criteriaBuilder.isNotNull(root.get("remindAt")));
+                        predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("remindAt"), now));
+                        predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("remindAt"), now.plusHours(24)));
+                    }
+                    default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported timePreset: " + normalizedTimePreset);
+                }
+            }
+
             boolean includeDeleted = Boolean.TRUE.equals(queryRequest.getIncludeDeleted());
             if (includeDeleted) {
                 predicates.add(criteriaBuilder.isNotNull(root.get("deletedAt")));
@@ -844,6 +924,42 @@ public class TodoService {
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    /**
+     * 规范化可选的重复类型筛选值。
+     *
+     * @param recurrenceType 原始重复类型筛选值
+     * @return 规范化后的重复类型；未提供时返回 null
+     */
+    private String normalizeOptionalRecurrenceFilter(String recurrenceType) {
+        if (!hasText(recurrenceType)) {
+            return null;
+        }
+
+        String normalizedRecurrenceType = recurrenceType.trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_RECURRENCE_TYPES.contains(normalizedRecurrenceType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "recurrenceType must be one of: " + ALLOWED_RECURRENCE_TYPES);
+        }
+        return normalizedRecurrenceType;
+    }
+
+    /**
+     * 规范化时间预设筛选值。
+     *
+     * @param timePreset 原始时间预设值
+     * @return 规范化后的时间预设；未提供时返回 null
+     */
+    private String normalizeTimePreset(String timePreset) {
+        if (!hasText(timePreset)) {
+            return null;
+        }
+
+        String normalizedTimePreset = timePreset.trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_TIME_PRESETS.contains(normalizedTimePreset)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "timePreset must be one of: " + ALLOWED_TIME_PRESETS);
+        }
+        return normalizedTimePreset;
     }
 
     /**
@@ -927,6 +1043,56 @@ public class TodoService {
         }
 
         return String.join(",", normalizedTags);
+    }
+
+    /**
+     * 规范化附件链接列表，移除空白行与重复值，最终按换行拼接存储。
+     *
+     * @param attachmentLinks 原始附件链接字符串
+     * @return 规范化后的附件链接字符串
+     */
+    private String normalizeAttachmentLinks(String attachmentLinks) {
+        if (!hasText(attachmentLinks)) {
+            return null;
+        }
+
+        List<String> normalizedLinks = List.of(attachmentLinks.split("\\R"))
+                .stream()
+                .map(String::trim)
+                .filter(this::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (normalizedLinks.isEmpty()) {
+            return null;
+        }
+
+        return String.join("\n", normalizedLinks);
+    }
+
+    /**
+     * 规范化协作人/观察者列表，按逗号分隔去重存储。
+     *
+     * @param rawPeople 原始人员列表
+     * @return 规范化后的逗号分隔字符串
+     */
+    private String normalizePeopleList(String rawPeople) {
+        if (!hasText(rawPeople)) {
+            return null;
+        }
+
+        List<String> normalizedPeople = List.of(rawPeople.split(","))
+                .stream()
+                .map(String::trim)
+                .filter(this::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (normalizedPeople.isEmpty()) {
+            return null;
+        }
+
+        return String.join(",", normalizedPeople);
     }
 
     /**

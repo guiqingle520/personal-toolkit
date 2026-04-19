@@ -10,7 +10,13 @@ function createTodo(): TodoItem {
     status: 'PENDING',
     priority: 3,
     category: 'Work',
+    remindAt: '2026-04-08T07:30:00',
     tags: 'backend',
+    notes: 'Draft release notes',
+    attachmentLinks: 'https://example.com/spec',
+    ownerLabel: 'Alice',
+    collaborators: 'Bob,Carol',
+    watchers: 'Dave',
     recurrenceType: 'DAILY',
     nextTriggerTime: '2026-04-09T09:00:00',
     completedAt: '2026-04-08T10:00:00',
@@ -25,7 +31,13 @@ function createDraft(): TodoDraft {
     priority: 3,
     category: 'Work',
     dueDate: '',
+    remindAt: '',
     tags: 'backend',
+    notes: '',
+    attachmentLinks: '',
+    ownerLabel: '',
+    collaborators: '',
+    watchers: '',
     recurrenceType: 'daily',
     recurrenceInterval: 1
   }
@@ -64,6 +76,12 @@ describe('TodoItemRow', () => {
     expect(wrapper.text()).toContain('1/3 completed')
     expect(wrapper.text()).toContain('Daily')
     expect(wrapper.text()).toContain('Scheduled:')
+    expect(wrapper.text()).toContain('Reminder:')
+    expect(wrapper.text()).toContain('Draft release notes')
+    expect(wrapper.text()).toContain('Open attachment')
+    expect(wrapper.text()).toContain('Owner: Alice')
+    expect(wrapper.text()).toContain('Collaborators: Bob,Carol')
+    expect(wrapper.text()).toContain('Watchers: Dave')
 
     await wrapper.find('.checklist-toggle-btn').trigger('click')
     expect(wrapper.emitted('toggleChecklist')).toHaveLength(1)

@@ -18,12 +18,13 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long>, JpaSpecif
 
     boolean existsByIdAndUserIdAndDeletedAtIsNull(Long id, Long userId);
 
-    boolean existsByUserIdAndDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
+    boolean existsByUserIdAndDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndRemindAtAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
             Long userId,
             String title,
             String status,
             Integer priority,
             LocalDateTime dueDate,
+            LocalDateTime remindAt,
             String category,
             String tags,
             String recurrenceType,
@@ -39,6 +40,11 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long>, JpaSpecif
     long countByUserIdAndDeletedAtIsNullAndStatusNot(Long userId, String status);
 
     long countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(Long userId, String status, LocalDateTime dueDate);
+
+    long countByUserIdAndDeletedAtIsNullAndStatusNotAndRemindAtBetween(Long userId,
+                                                                       String status,
+                                                                       LocalDateTime remindAtStart,
+                                                                       LocalDateTime remindAtEnd);
 
     @Query("""
              select t.category,

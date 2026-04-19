@@ -6,8 +6,14 @@ export interface TodoItem {
   status: TodoStatus | string
   priority?: number
   dueDate?: string
+  remindAt?: string
   category?: string
   tags?: string
+  notes?: string
+  attachmentLinks?: string
+  ownerLabel?: string
+  collaborators?: string
+  watchers?: string
   createTime: string
   updateTime: string
   subItemSummary?: TodoSubItemSummary
@@ -36,8 +42,12 @@ export interface TodoFiltersModel {
   category: string
   keyword: string
   tag: string
+  recurrenceType: string
+  timePreset: string
   dueDateFrom: string
   dueDateTo: string
+  remindDateFrom: string
+  remindDateTo: string
   sortBy: string
   sortDir: string
 }
@@ -47,7 +57,13 @@ export interface TodoDraft {
   priority: number
   category: string
   dueDate: string
+  remindAt: string
   tags: string
+  notes: string
+  attachmentLinks: string
+  ownerLabel: string
+  collaborators: string
+  watchers: string
   recurrenceType?: string
   recurrenceInterval?: number
   recurrenceEndTime?: string
@@ -83,6 +99,7 @@ export interface TodoStatsOverview {
   weekCompleted: number
   overdueCount: number
   activeCount: number
+  upcomingReminderCount: number
 }
 
 export interface TodoStatsCategoryItem {

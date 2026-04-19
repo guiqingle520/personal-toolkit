@@ -15,6 +15,8 @@ public class TodoQueryRequest {
     private String category;
     private String keyword;
     private String tag;
+    private String recurrenceType;
+    private String timePreset;
     private Boolean includeDeleted;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -22,6 +24,12 @@ public class TodoQueryRequest {
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate dueDateTo;
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate remindDateFrom;
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate remindDateTo;
 
     /**
      * 返回待办状态筛选条件。
@@ -114,6 +122,42 @@ public class TodoQueryRequest {
     }
 
     /**
+     * 返回重复任务类型筛选条件。
+     *
+     * @return 重复任务类型
+     */
+    public String getRecurrenceType() {
+        return recurrenceType;
+    }
+
+    /**
+     * 设置重复任务类型筛选条件。
+     *
+     * @param recurrenceType 重复任务类型
+     */
+    public void setRecurrenceType(String recurrenceType) {
+        this.recurrenceType = recurrenceType;
+    }
+
+    /**
+     * 返回时间预设筛选条件。
+     *
+     * @return 时间预设
+     */
+    public String getTimePreset() {
+        return timePreset;
+    }
+
+    /**
+     * 设置时间预设筛选条件。
+     *
+     * @param timePreset 时间预设
+     */
+    public void setTimePreset(String timePreset) {
+        this.timePreset = timePreset;
+    }
+
+    /**
      * 返回是否包含已删除数据。
      *
      * @return 是否包含已删除数据
@@ -165,5 +209,41 @@ public class TodoQueryRequest {
      */
     public void setDueDateTo(LocalDate dueDateTo) {
         this.dueDateTo = dueDateTo;
+    }
+
+    /**
+     * 返回提醒时间下限。
+     *
+     * @return 提醒时间开始值
+     */
+    public LocalDate getRemindDateFrom() {
+        return remindDateFrom;
+    }
+
+    /**
+     * 设置提醒时间下限。
+     *
+     * @param remindDateFrom 提醒时间开始值
+     */
+    public void setRemindDateFrom(LocalDate remindDateFrom) {
+        this.remindDateFrom = remindDateFrom;
+    }
+
+    /**
+     * 返回提醒时间上限。
+     *
+     * @return 提醒时间结束值
+     */
+    public LocalDate getRemindDateTo() {
+        return remindDateTo;
+    }
+
+    /**
+     * 设置提醒时间上限。
+     *
+     * @param remindDateTo 提醒时间结束值
+     */
+    public void setRemindDateTo(LocalDate remindDateTo) {
+        this.remindDateTo = remindDateTo;
     }
 }

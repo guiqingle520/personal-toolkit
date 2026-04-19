@@ -52,7 +52,13 @@ const newTodo = ref<TodoDraft>({
   priority: 3,
   category: '',
   dueDate: '',
+  remindAt: '',
   tags: '',
+  notes: '',
+  attachmentLinks: '',
+  ownerLabel: '',
+  collaborators: '',
+  watchers: '',
   recurrenceType: '',
   recurrenceInterval: 1,
   recurrenceEndTime: ''
@@ -64,7 +70,13 @@ const editTodoForm = ref<TodoDraft>({
   priority: 3,
   category: '',
   dueDate: '',
+  remindAt: '',
   tags: '',
+  notes: '',
+  attachmentLinks: '',
+  ownerLabel: '',
+  collaborators: '',
+  watchers: '',
   recurrenceType: '',
   recurrenceInterval: 1,
   recurrenceEndTime: ''
@@ -78,8 +90,12 @@ const filters = ref<TodoFiltersModel>({
   category: '',
   keyword: '',
   tag: '',
+  recurrenceType: '',
+  timePreset: '',
   dueDateFrom: '',
   dueDateTo: '',
+  remindDateFrom: '',
+  remindDateTo: '',
   sortBy: 'createTime',
   sortDir: 'DESC'
 })
@@ -281,8 +297,12 @@ function resetFilters() {
     category: '',
     keyword: '',
     tag: '',
+    recurrenceType: '',
+    timePreset: '',
     dueDateFrom: '',
     dueDateTo: '',
+    remindDateFrom: '',
+    remindDateTo: '',
     sortBy: 'createTime',
     sortDir: 'DESC'
   }
@@ -317,7 +337,13 @@ async function createTodo() {
           priority: newTodo.value.priority,
           category: newTodo.value.category,
           dueDate: toDateTimeValue(newTodo.value.dueDate),
+          remindAt: toDateTimeValue(newTodo.value.remindAt),
           tags: newTodo.value.tags,
+          notes: newTodo.value.notes,
+          attachmentLinks: newTodo.value.attachmentLinks,
+          ownerLabel: newTodo.value.ownerLabel,
+          collaborators: newTodo.value.collaborators,
+          watchers: newTodo.value.watchers,
           recurrenceType: newTodo.value.recurrenceType || undefined,
           recurrenceInterval: newTodo.value.recurrenceType ? (newTodo.value.recurrenceInterval || 1) : undefined,
           recurrenceEndTime: newTodo.value.recurrenceType ? toDateTimeValue(newTodo.value.recurrenceEndTime || '') : undefined
@@ -329,7 +355,7 @@ async function createTodo() {
     })
     
     await loadTodos()
-    newTodo.value = { title: '', priority: 3, category: '', dueDate: '', tags: '', recurrenceType: '', recurrenceInterval: 1, recurrenceEndTime: '' }
+    newTodo.value = { title: '', priority: 3, category: '', dueDate: '', remindAt: '', tags: '', notes: '', attachmentLinks: '', ownerLabel: '', collaborators: '', watchers: '', recurrenceType: '', recurrenceInterval: 1, recurrenceEndTime: '' }
   } catch (error) {
     handleError(error)
   } finally {
@@ -344,7 +370,13 @@ async function startEdit(todo: TodoItem) {
       priority: todo.priority || 3,
       category: todo.category || '',
       dueDate: formatDateForInput(todo.dueDate),
+      remindAt: formatDateForInput(todo.remindAt),
       tags: todo.tags || '',
+      notes: todo.notes || '',
+      attachmentLinks: todo.attachmentLinks || '',
+      ownerLabel: todo.ownerLabel || '',
+      collaborators: todo.collaborators || '',
+      watchers: todo.watchers || '',
       recurrenceType: todo.recurrenceType || '',
       recurrenceInterval: todo.recurrenceInterval || 1,
       recurrenceEndTime: formatDateForInput(todo.recurrenceEndTime)
@@ -372,7 +404,13 @@ async function saveEdit(todo: TodoItem) {
         priority: editTodoForm.value.priority,
         category: editTodoForm.value.category,
         dueDate: toDateTimeValue(editTodoForm.value.dueDate),
+        remindAt: toDateTimeValue(editTodoForm.value.remindAt),
         tags: editTodoForm.value.tags,
+        notes: editTodoForm.value.notes,
+        attachmentLinks: editTodoForm.value.attachmentLinks,
+        ownerLabel: editTodoForm.value.ownerLabel,
+        collaborators: editTodoForm.value.collaborators,
+        watchers: editTodoForm.value.watchers,
         recurrenceType: editTodoForm.value.recurrenceType || undefined,
         recurrenceInterval: editTodoForm.value.recurrenceType ? (editTodoForm.value.recurrenceInterval || 1) : undefined,
         recurrenceEndTime: editTodoForm.value.recurrenceType ? toDateTimeValue(editTodoForm.value.recurrenceEndTime || '') : undefined
@@ -394,6 +432,10 @@ async function saveEdit(todo: TodoItem) {
 
 async function toggleStatus(todo: TodoItem) {
   const newStatus = todo.status === 'DONE' ? 'PENDING' : 'DONE'
+  await moveTodoToStatus(todo, newStatus)
+}
+
+async function moveTodoToStatus(todo: TodoItem, newStatus: 'PENDING' | 'DONE') {
   submitting.value = true
   errorMessage.value = ''
 
@@ -405,8 +447,14 @@ async function toggleStatus(todo: TodoItem) {
         status: newStatus,
         priority: todo.priority ?? 3,
         dueDate: todo.dueDate ?? null,
+        remindAt: todo.remindAt ?? null,
         category: todo.category ?? '',
         tags: todo.tags ?? '',
+        notes: todo.notes ?? '',
+        attachmentLinks: todo.attachmentLinks ?? '',
+        ownerLabel: todo.ownerLabel ?? '',
+        collaborators: todo.collaborators ?? '',
+        watchers: todo.watchers ?? '',
         recurrenceType: todo.recurrenceType || undefined,
         recurrenceInterval: todo.recurrenceType ? (todo.recurrenceInterval || 1) : undefined,
         recurrenceEndTime: todo.recurrenceType ? (todo.recurrenceEndTime || undefined) : undefined
@@ -719,6 +767,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             @update:selected="handleSelectedUpdate"
             @update:editForm="handleEditFormUpdate"
             @toggleStatus="toggleStatus"
+            @moveTodo="moveTodoToStatus"
             @startEdit="startEdit"
             @cancelEdit="cancelEdit"
             @saveEdit="saveEdit"

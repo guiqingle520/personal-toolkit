@@ -4,19 +4,23 @@ import { mountWithI18n } from '../../test/test-utils'
 import type { TodoFiltersModel } from './types'
 
 function createFilters(overrides: Partial<TodoFiltersModel> = {}): TodoFiltersModel {
-  return {
-    page: 2,
-    size: 10,
-    status: '',
-    priority: '',
-    category: '',
-    keyword: '',
-    tag: '',
-    dueDateFrom: '',
-    dueDateTo: '',
-    sortBy: 'createTime',
-    sortDir: 'DESC',
-    ...overrides,
+    return {
+      page: 2,
+      size: 10,
+      status: '',
+      priority: '',
+      category: '',
+      keyword: '',
+      tag: '',
+      recurrenceType: '',
+      timePreset: '',
+      dueDateFrom: '',
+      dueDateTo: '',
+      remindDateFrom: '',
+      remindDateTo: '',
+      sortBy: 'createTime',
+      sortDir: 'DESC',
+      ...overrides,
   }
 }
 
@@ -54,18 +58,27 @@ describe('TodoFilters', () => {
 
     const statusSelect = wrapper.findAll('select')[0]
     const prioritySelect = wrapper.findAll('select')[1]
+    const recurrenceSelect = wrapper.findAll('select')[2]
     await statusSelect.setValue('DONE')
     await prioritySelect.setValue('4')
+    await recurrenceSelect.setValue('DAILY')
 
     const dateInputs = wrapper.findAll('.localized-date-input-wrapper input')
     await dateInputs[0].setValue('2026-04-07')
+    await dateInputs[2].setValue('2026-04-09')
 
     const updates = wrapper.emitted('update:filters')
-    expect(updates).toHaveLength(3)
+    expect(updates).toHaveLength(5)
     expect(updates?.[0]?.[0]).toMatchObject({ status: 'DONE' })
     expect(updates?.[1]?.[0]).toMatchObject({ priority: '4' })
-    expect(updates?.[2]?.[0]).toMatchObject({ dueDateFrom: '2026-04-07' })
-    expect(wrapper.emitted('loadTodos')).toHaveLength(3)
+    expect(updates?.[2]?.[0]).toMatchObject({ recurrenceType: 'DAILY' })
+    expect(updates?.[3]?.[0]).toMatchObject({ dueDateFrom: '2026-04-07' })
+    expect(updates?.[4]?.[0]).toMatchObject({ remindDateFrom: '2026-04-09' })
+    expect(wrapper.emitted('loadTodos')).toHaveLength(5)
+
+    const presetButton = wrapper.findAll('.filter-preset-btn')[0]
+    await presetButton.trigger('click')
+    expect(wrapper.emitted('update:filters')?.[5]?.[0]).toMatchObject({ timePreset: 'DUE_TODAY' })
 
     const resetButton = wrapper.find('button.btn-ghost')
     await resetButton.trigger('click')

@@ -19,6 +19,23 @@ export function formatDateForInput(value?: string): string {
 }
 
 /**
+ * 将日期时间渲染为当前语言环境下的短日期时间文本。
+ */
+export function formatDateTimeLabel(value?: string, locale = 'en'): string {
+  if (!value) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value))
+}
+
+/**
  * 将逗号分隔的标签字符串解析为标签数组。
  */
 export function parseTags(tags?: string): string[] {

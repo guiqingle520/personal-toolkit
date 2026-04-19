@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import TodoSubItemList from './TodoSubItemList.vue'
 import LocalizedDateInput from './LocalizedDateInput.vue'
 import {
+  formatDateTimeLabel,
   formatPriorityLabel,
   formatRecurrenceLabelKey,
   parseTags,
@@ -80,7 +81,17 @@ function formatTimestamp(value: string, loc: string): string {
           </select>
           <input :value="editForm.category" type="text" :placeholder="$t('filter.category')" class="cyber-input form-sm" :list="categoryListId" @input="$emit('update:editForm', { ...editForm, category: ($event.target as HTMLInputElement).value })" />
           <LocalizedDateInput :modelValue="editForm.dueDate" class="cyber-input form-sm" @update:modelValue="$emit('update:editForm', { ...editForm, dueDate: $event })" />
+          <LocalizedDateInput :modelValue="editForm.remindAt" :placeholder="$t('reminder.remindAt')" class="cyber-input form-sm" @update:modelValue="$emit('update:editForm', { ...editForm, remindAt: $event })" />
           <input :value="editForm.tags" type="text" :placeholder="$t('form.tagsCsvEdit')" class="cyber-input form-sm" :list="tagListId" @input="$emit('update:editForm', { ...editForm, tags: ($event.target as HTMLInputElement).value })" />
+          </div>
+          <div class="edit-row">
+            <textarea :value="editForm.notes" :placeholder="$t('form.notes')" class="cyber-input form-sm todo-notes-input" @input="$emit('update:editForm', { ...editForm, notes: ($event.target as HTMLTextAreaElement).value })" />
+            <textarea :value="editForm.attachmentLinks" :placeholder="$t('form.attachmentLinks')" class="cyber-input form-sm todo-notes-input" @input="$emit('update:editForm', { ...editForm, attachmentLinks: ($event.target as HTMLTextAreaElement).value })" />
+          </div>
+          <div class="edit-row">
+            <input :value="editForm.ownerLabel" :placeholder="$t('form.ownerLabel')" class="cyber-input form-sm" @input="$emit('update:editForm', { ...editForm, ownerLabel: ($event.target as HTMLInputElement).value })" />
+            <input :value="editForm.collaborators" :placeholder="$t('form.collaborators')" class="cyber-input form-sm" @input="$emit('update:editForm', { ...editForm, collaborators: ($event.target as HTMLInputElement).value })" />
+            <input :value="editForm.watchers" :placeholder="$t('form.watchers')" class="cyber-input form-sm" @input="$emit('update:editForm', { ...editForm, watchers: ($event.target as HTMLInputElement).value })" />
           </div>
           <div class="edit-row">
             <select :value="editForm.recurrenceType || ''" class="cyber-input form-sm" @change="$emit('update:editForm', { ...editForm, recurrenceType: ($event.target as HTMLSelectElement).value || undefined })">
@@ -107,11 +118,30 @@ function formatTimestamp(value: string, loc: string): string {
           <span v-if="todo.completedAt" class="badge badge-success">{{ $t('recurrence.completedAt', { time: formatTimestamp(todo.completedAt, locale) }) }}</span>
           <span v-if="todo.category" class="badge badge-category">{{ todo.category }}</span>
           <span v-if="todo.dueDate" class="badge badge-date">📅 {{ todo.dueDate }}</span>
+          <span v-if="todo.remindAt" class="badge badge-info">⏰ {{ $t('reminder.scheduledAt', { time: formatDateTimeLabel(todo.remindAt, locale) }) }}</span>
+          <span v-if="todo.ownerLabel" class="badge badge-category">👤 {{ $t('collaboration.ownerLabel', { value: todo.ownerLabel }) }}</span>
+          <span v-if="todo.collaborators" class="badge badge-info">🤝 {{ $t('collaboration.collaboratorsLabel', { value: todo.collaborators }) }}</span>
+          <span v-if="todo.watchers" class="badge badge-info">👁 {{ $t('collaboration.watchersLabel', { value: todo.watchers }) }}</span>
           <span v-for="tag in parseTags(todo.tags)" :key="tag" class="badge badge-tag">#{{ tag }}</span>
           <button v-if="viewMode === 'ACTIVE'" class="badge badge-category checklist-toggle-btn" type="button" @click="$emit('toggleChecklist')">
             {{ $t('checklist.progress', { completed: checklistSummary?.completedCount ?? 0, total: checklistSummary?.totalCount ?? 0 }) }}
           </button>
           <span class="time">{{ formatTimestamp(todo.createTime, locale) }}</span>
+        </div>
+
+        <p v-if="todo.notes" class="todo-notes-preview">{{ todo.notes }}</p>
+
+        <div v-if="todo.attachmentLinks" class="todo-attachment-list">
+          <a
+            v-for="link in todo.attachmentLinks.split(/\r?\n/).filter(Boolean)"
+            :key="link"
+            :href="link"
+            target="_blank"
+            rel="noreferrer"
+            class="badge badge-info todo-attachment-link"
+          >
+            {{ $t('form.attachmentLink') }}
+          </a>
         </div>
 
         <TodoSubItemList

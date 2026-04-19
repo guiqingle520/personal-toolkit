@@ -27,9 +27,14 @@
 - ✅ 登录随机验证码（SVG）
 - ✅ 登录失败按 IP / 账号标识限流
 - ✅ Todo 数据按账号隔离
+- ✅ Todo 提醒时间
 - ✅ 完整的 CRUD 操作（创建、查询、更新、删除）
 - ✅ 任务状态管理（待处理/已完成）
 - ✅ 分页、筛选与回收站
+- ✅ 时间预设筛选（今日到期 / 逾期 / 即将提醒）
+- ✅ 重复类型筛选与活动筛选 chips
+- ✅ 长备注与附件链接
+- ✅ 协作能力预留（负责人 / 协作人 / 观察者占位字段）
 - ✅ Checklist / 子任务管理
 - ✅ 重复任务（完成后生成下一条实例）
 - ✅ 统计面板（概览 / 分类 / 最近 7 天趋势）
@@ -648,6 +653,34 @@ GET /api/todos/options
 
 ---
 
+#### 2.1 筛选增强说明
+
+`GET /api/todos` 当前支持以下增强筛选字段：
+
+- `recurrenceType`：按重复类型筛选，取值 `NONE / DAILY / WEEKLY / MONTHLY`
+- `timePreset`：按时间预设筛选，取值：
+  - `DUE_TODAY`：今日到期
+  - `OVERDUE`：逾期未完成
+  - `UPCOMING_REMINDER`：未来 24 小时内即将提醒
+
+前端列表页会展示活动筛选 chips，可直接点击移除对应筛选条件。
+
+当前协作能力仍为占位实现：
+
+- `ownerLabel`：负责人显示名
+- `collaborators`：协作人，逗号分隔
+- `watchers`：观察者，逗号分隔
+
+这些字段当前用于保存和展示协作上下文，尚未接入真实的多人权限与共享流。
+
+**示例**
+
+```http
+GET /api/todos?recurrenceType=DAILY&timePreset=OVERDUE&page=0&size=10
+```
+
+---
+
 #### 3. 查询统计概览
 
 **请求**
@@ -690,6 +723,8 @@ GET /api/todos/{id}
     "id": 1,
     "title": "学习 Spring Boot",
     "status": "PENDING",
+    "notes": "整理认证接口说明",
+    "attachmentLinks": "https://example.com/spec\nhttps://example.com/mock",
     "createTime": "2024-01-01T10:00:00",
     "updateTime": "2024-01-01T10:00:00"
   },

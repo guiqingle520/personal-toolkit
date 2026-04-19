@@ -119,8 +119,14 @@ class TodoServiceTest {
         request.setTitle("  Write tests  ");
         request.setStatus("pending");
         request.setPriority(4);
+        request.setRemindAt(LocalDateTime.of(2026, 4, 11, 8, 30));
         request.setCategory("  Work  ");
         request.setTags(" urgent, backend ,urgent ");
+        request.setNotes("  Write backend summary  ");
+        request.setAttachmentLinks(" https://example.com/spec \nhttps://example.com/spec\nhttps://example.com/runbook ");
+        request.setOwnerLabel(" Alice ");
+        request.setCollaborators(" Bob, Carol ,Bob ");
+        request.setWatchers(" Dave, Erin ");
 
         when(todoRepository.save(any(TodoItem.class))).thenAnswer(invocation -> {
             TodoItem entity = invocation.getArgument(0);
@@ -134,6 +140,12 @@ class TodoServiceTest {
         assertEquals("Write tests", result.getTitle());
         assertEquals("Work", result.getCategory());
         assertEquals("urgent,backend", result.getTags());
+        assertEquals(LocalDateTime.of(2026, 4, 11, 8, 30), result.getRemindAt());
+        assertEquals("Write backend summary", result.getNotes());
+        assertEquals("https://example.com/spec\nhttps://example.com/runbook", result.getAttachmentLinks());
+        assertEquals("Alice", result.getOwnerLabel());
+        assertEquals("Bob,Carol", result.getCollaborators());
+        assertEquals("Dave,Erin", result.getWatchers());
         verify(valueOperations).set(eq(TodoCacheKeys.todoItem(USER_ID, 1L)), any(TodoItem.class), any());
     }
 
@@ -182,18 +194,25 @@ class TodoServiceTest {
         TodoItem recurringTodo = createTodo(21L, "PENDING", null);
         recurringTodo.setTitle("Daily sync");
         recurringTodo.setDueDate(LocalDateTime.of(2026, 4, 10, 9, 0));
+        recurringTodo.setRemindAt(LocalDateTime.of(2026, 4, 10, 8, 30));
+        recurringTodo.setNotes("Run sync agenda");
+        recurringTodo.setAttachmentLinks("https://example.com/sync");
+        recurringTodo.setOwnerLabel("Alice");
+        recurringTodo.setCollaborators("Bob,Carol");
+        recurringTodo.setWatchers("Dave");
         recurringTodo.setRecurrenceType("DAILY");
         recurringTodo.setRecurrenceInterval(1);
         recurringTodo.setNextTriggerTime(LocalDateTime.of(2026, 4, 10, 9, 0));
 
         when(todoRepository.findAllByUserIdAndIdIn(USER_ID, List.of(21L))).thenReturn(List.of(recurringTodo));
         when(todoRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(todoRepository.existsByUserIdAndDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
+        when(todoRepository.existsByUserIdAndDeletedAtIsNullAndTitleAndStatusAndPriorityAndDueDateAndRemindAtAndCategoryAndTagsAndRecurrenceTypeAndRecurrenceIntervalAndRecurrenceEndTimeAndNextTriggerTime(
                 eq(USER_ID),
                 eq("Daily sync"),
                 eq("PENDING"),
                 eq(3),
                 eq(LocalDateTime.of(2026, 4, 11, 9, 0)),
+                eq(LocalDateTime.of(2026, 4, 11, 8, 30)),
                 eq(null),
                 eq(null),
                 eq("DAILY"),
@@ -210,6 +229,12 @@ class TodoServiceTest {
         TodoItem generatedTodo = generatedTodosCaptor.getAllValues().get(1).get(0);
         assertEquals(USER_ID, generatedTodo.getUser().getId());
         assertEquals(LocalDateTime.of(2026, 4, 11, 9, 0), generatedTodo.getDueDate());
+        assertEquals(LocalDateTime.of(2026, 4, 11, 8, 30), generatedTodo.getRemindAt());
+        assertEquals("Run sync agenda", generatedTodo.getNotes());
+        assertEquals("https://example.com/sync", generatedTodo.getAttachmentLinks());
+        assertEquals("Alice", generatedTodo.getOwnerLabel());
+        assertEquals("Bob,Carol", generatedTodo.getCollaborators());
+        assertEquals("Dave", generatedTodo.getWatchers());
     }
 
     /**
@@ -221,6 +246,7 @@ class TodoServiceTest {
                 .thenReturn(2L, 7L);
         when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(eq(USER_ID), eq("DONE"), any(LocalDateTime.class))).thenReturn(3L);
         when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(11L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndRemindAtBetween(eq(USER_ID), eq("DONE"), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(5L);
 
         TodoStatsOverviewResponse response = todoService.getStatsOverview();
 
@@ -228,6 +254,7 @@ class TodoServiceTest {
         assertEquals(7L, response.getWeekCompleted());
         assertEquals(3L, response.getOverdueCount());
         assertEquals(11L, response.getActiveCount());
+        assertEquals(5L, response.getUpcomingReminderCount());
     }
 
     /**
@@ -266,6 +293,40 @@ class TodoServiceTest {
 
         assertEquals(1, response.getContent().size());
         assertEquals(2, response.getContent().get(0).getSubItemSummary().getTotalCount());
+    }
+
+    /**
+     * 无效的重复筛选值应在进入仓储层前被拒绝。
+     */
+    @Test
+    void findAllShouldRejectInvalidRecurrenceFilter() {
+        TodoQueryRequest queryRequest = new TodoQueryRequest();
+        queryRequest.setRecurrenceType("YEARLY");
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> todoService.findAll(queryRequest, 0, 10, Sort.by("createTime"))
+        );
+
+        assertEquals(400, exception.getStatusCode().value());
+        verify(todoRepository, never()).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class));
+    }
+
+    /**
+     * 无效的时间预设值应在进入仓储层前被拒绝。
+     */
+    @Test
+    void findAllShouldRejectInvalidTimePreset() {
+        TodoQueryRequest queryRequest = new TodoQueryRequest();
+        queryRequest.setTimePreset("NEXT_MONTH");
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> todoService.findAll(queryRequest, 0, 10, Sort.by("createTime"))
+        );
+
+        assertEquals(400, exception.getStatusCode().value());
+        verify(todoRepository, never()).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class));
     }
 
     /**
