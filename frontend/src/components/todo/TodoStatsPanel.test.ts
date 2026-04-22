@@ -14,6 +14,8 @@ function mountWithLocale(locale: 'en' | 'zh-CN' = 'en') {
         weekCompleted: 7,
         overdueCount: 3,
         activeCount: 11,
+        upcomingReminderCount: 5,
+        unreadReminderCount: 4,
       },
       categories: [
         { category: 'Work', activeCount: 4, completedCount: 2 },
@@ -45,6 +47,7 @@ describe('TodoStatsPanel', () => {
     expect(wrapper.text()).toContain('Week Completed')
     expect(wrapper.text()).toContain('Overdue Tasks')
     expect(wrapper.text()).toContain('Active Tasks')
+    expect(wrapper.text()).toContain('Unread Reminders')
     expect(wrapper.text()).toContain('Uncategorized')
     expect(wrapper.text()).toContain('Active: 3')
     expect(wrapper.text()).toContain('Completed: 1')
@@ -55,6 +58,7 @@ describe('TodoStatsPanel', () => {
 
     expect(wrapper.text()).toContain('今日完成')
     expect(wrapper.text()).toContain('本周完成')
+    expect(wrapper.text()).toContain('未读提醒')
     expect(wrapper.text()).toContain('未分类')
     expect(wrapper.text()).toContain('活动：3')
     expect(wrapper.text()).toContain('完成：1')

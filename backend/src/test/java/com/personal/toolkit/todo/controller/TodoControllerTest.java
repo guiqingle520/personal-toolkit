@@ -109,7 +109,7 @@ class TodoControllerTest {
      */
     @Test
     void getStatsOverviewShouldReturnOverviewPayload() throws Exception {
-        when(todoService.getStatsOverview()).thenReturn(new TodoStatsOverviewResponse(2, 7, 3, 11, 5));
+        when(todoService.getStatsOverview()).thenReturn(new TodoStatsOverviewResponse(2, 7, 3, 11, 5, 4));
 
         mockMvc.perform(get("/api/todos/stats/overview"))
                 .andExpect(status().isOk())
@@ -119,7 +119,8 @@ class TodoControllerTest {
                 .andExpect(jsonPath("$.data.weekCompleted").value(7))
                 .andExpect(jsonPath("$.data.overdueCount").value(3))
                 .andExpect(jsonPath("$.data.activeCount").value(11))
-                .andExpect(jsonPath("$.data.upcomingReminderCount").value(5));
+                .andExpect(jsonPath("$.data.upcomingReminderCount").value(5))
+                .andExpect(jsonPath("$.data.unreadReminderCount").value(4));
     }
 
     /**

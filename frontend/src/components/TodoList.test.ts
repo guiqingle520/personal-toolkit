@@ -5,6 +5,12 @@ import i18n from '../i18n'
 import { syncDocumentLocale } from '../i18n'
 
 const fetchMock = vi.fn()
+const promptMock = vi.fn()
+const confirmMock = vi.fn()
+const pushStateMock = vi.fn()
+const replaceStateMock = vi.fn()
+const actualPushState = window.history.pushState.bind(window.history)
+const actualReplaceState = window.history.replaceState.bind(window.history)
 
 function createPageResponse() {
   return {
@@ -97,7 +103,42 @@ function createStatsOverviewResponse() {
       overdueCount: 3,
       activeCount: 11,
       upcomingReminderCount: 5,
+      unreadReminderCount: 4,
     })
+}
+
+function createReminderPageResponse() {
+  return createSuccessResponse({
+    content: [
+      {
+        id: 201,
+        todoId: 1,
+        todoTitle: 'Alpha',
+        scheduledAt: '2026-04-08T07:30:00',
+        status: 'SENT',
+        category: 'Work',
+      },
+    ],
+    totalElements: 1,
+    totalPages: 1,
+    page: 0,
+    size: 10,
+    first: true,
+    last: true,
+  })
+}
+
+function createSavedViewsResponse() {
+  return createSuccessResponse([
+    {
+      id: 301,
+      name: 'Ops Focus',
+      isDefault: true,
+      filters: { status: 'PENDING', keyword: 'Alpha' },
+      createTime: '2026-04-07T00:00:00',
+      updateTime: '2026-04-07T00:00:00',
+    },
+  ])
 }
 
 function createStatsCategoryResponse() {
@@ -159,12 +200,36 @@ function getFilterControls(wrapper) {
 describe('TodoList reset behavior', () => {
   beforeEach(() => {
     fetchMock.mockReset()
+    promptMock.mockReset()
+    confirmMock.mockReset()
+    pushStateMock.mockReset()
+    replaceStateMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
-    fetchMock.mockImplementation(async (url, options) => {
+    vi.stubGlobal('prompt', promptMock)
+    vi.stubGlobal('confirm', confirmMock)
+    window.history.pushState = ((state, unused, url) => {
+      pushStateMock(state, unused, url)
+      actualPushState(state, unused, url)
+    }) as History['pushState']
+    window.history.replaceState = ((state, unused, url) => {
+      replaceStateMock(state, unused, url)
+      actualReplaceState(state, unused, url)
+    }) as History['replaceState']
+    window.history.replaceState({}, '', '/')
+    confirmMock.mockReturnValue(true)
+      fetchMock.mockImplementation(async (url, options) => {
+      if (url.includes('/api/todo-saved-views/') && url.includes('/default')) return { ok: true, json: async () => createSuccessResponse({ id: 301, name: 'Ops Focus', isDefault: true, filters: { status: 'PENDING' }, createTime: '2026-04-07T00:00:00', updateTime: '2026-04-07T00:00:00' }) }
+      if (url.includes('/api/todo-saved-views/') && options?.method === 'PUT') return { ok: true, json: async () => createSuccessResponse({ id: 301, name: 'Ops Focus', isDefault: false, filters: { status: 'PENDING' }, createTime: '2026-04-07T00:00:00', updateTime: '2026-04-07T00:00:00' }) }
+      if (url.includes('/api/todo-saved-views/') && options?.method === 'DELETE') return { ok: true, json: async () => createSuccessResponse(null) }
+      if (url.includes('/api/todo-saved-views') && options?.method === 'POST') return { ok: true, json: async () => createSuccessResponse({ id: 301, name: 'Ops Focus', isDefault: false, filters: { status: 'PENDING' }, createTime: '2026-04-07T00:00:00', updateTime: '2026-04-07T00:00:00' }) }
+      if (url.includes('/api/todo-saved-views')) return { ok: true, json: async () => createSavedViewsResponse() }
       if (url.includes('/api/todos/options')) return { ok: true, json: async () => createOptionsResponse() }
       if (url.includes('/api/todos/stats/overview')) return { ok: true, json: async () => createStatsOverviewResponse() }
       if (url.includes('/api/todos/stats/by-category')) return { ok: true, json: async () => createStatsCategoryResponse() }
       if (url.includes('/api/todos/stats/trend')) return { ok: true, json: async () => createStatsTrendResponse() }
+      if (url.includes('/api/todo-reminders/read-all')) return { ok: true, json: async () => createSuccessResponse(null) }
+      if (url.includes('/api/todo-reminders/') && url.includes('/read')) return { ok: true, json: async () => createSuccessResponse(null) }
+      if (url.includes('/api/todo-reminders')) return { ok: true, json: async () => createReminderPageResponse() }
       if (url.includes('/api/todos/1/sub-items') && options?.method === 'POST') return { ok: true, json: async () => createSuccessResponse({ id: 102, todoId: 1, title: 'Ship checklist UI', status: 'PENDING', sortOrder: 1, createTime: '2026-04-07T00:00:00', updateTime: '2026-04-07T00:00:00' }) }
       if (url.includes('/api/todos/1/sub-items') && (!options?.method || options.method === 'GET')) return { ok: true, json: async () => createSubItemsResponse() }
       if (url.includes('/api/todos') && options?.method === 'POST') {
@@ -226,14 +291,62 @@ describe('TodoList reset behavior', () => {
     await controls.presetButton.trigger('click')
     await flushPromises()
 
+    expect(fetchMock.mock.calls.some(([url]) => url === '/api/todos?page=0&size=10&status=PENDING&keyword=Alpha&recurrenceType=DAILY&timePreset=DUE_TODAY&sortBy=createTime&sortDir=DESC')).toBe(true)
+    expect(pushStateMock).toHaveBeenCalled()
+  })
+
+  it('loads reminder panel data on mount', async () => {
+    await mountTodoList()
+
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/todos?page=0&size=10&recurrenceType=DAILY&timePreset=DUE_TODAY&sortBy=createTime&sortDir=DESC',
+      '/api/todo-reminders?status=SENT&page=0&size=10',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
         }),
       }),
     )
+  })
+
+  it('loads saved views on mount', async () => {
+    await mountTodoList()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todo-saved-views',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+  })
+
+  it('applies default saved view before first list query', async () => {
+    await mountTodoList()
+
+    const todoCalls = fetchMock.mock.calls.filter(([url]) => typeof url === 'string' && url.startsWith('/api/todos?page='))
+    expect(todoCalls[0]?.[0]).toBe('/api/todos?page=0&size=10&status=PENDING&keyword=Alpha&sortBy=createTime&sortDir=DESC')
+  })
+
+  it('uses URL query ahead of default saved view on first load', async () => {
+    window.history.replaceState({}, '', '/?status=DONE&keyword=retro')
+
+    await mountTodoList()
+
+    const todoCalls = fetchMock.mock.calls.filter(([url]) => typeof url === 'string' && url.startsWith('/api/todos?page='))
+    expect(todoCalls[0]?.[0]).toBe('/api/todos?page=0&size=10&status=DONE&keyword=retro&sortBy=createTime&sortDir=DESC')
+  })
+
+  it('saves current view from filters panel', async () => {
+    promptMock.mockReturnValue('Ops Focus')
+    const wrapper = await mountTodoList()
+
+    const saveViewButton = wrapper.findAll('.filter-section button').find((button) => button.text().includes('Save current view'))
+    expect(saveViewButton).toBeTruthy()
+    await saveViewButton!.trigger('click')
+    await flushPromises()
+
+    expect(fetchMock.mock.calls.some(([url, options]) => url === '/api/todo-saved-views' && options?.method === 'POST')).toBe(true)
   })
 
   it('clears selection and forces page zero when child filter updates arrive', async () => {
@@ -262,13 +375,14 @@ describe('TodoList reset behavior', () => {
     await mountTodoList()
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/todos?page=0&size=10&sortBy=createTime&sortDir=DESC',
+      '/api/todos?page=0&size=10&status=PENDING&keyword=Alpha&sortBy=createTime&sortDir=DESC',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
         }),
       }),
     )
+    expect(replaceStateMock).toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/todos/options',
       expect.objectContaining({
@@ -457,6 +571,130 @@ describe('TodoList reset behavior', () => {
     )
   })
 
+  it('shows recovery action when created todo is hidden by active filters', async () => {
+    const wrapper = await mountTodoList()
+    const createRows = wrapper.findAll('.create-form .create-row')
+    const titleInput = createRows[0].find('input[type="text"]')
+    const statusSelect = wrapper.find('.filter-section select')
+    const addButton = createRows[1].find('button.btn-primary')
+
+    await statusSelect.setValue('DONE')
+    await titleInput.setValue('Hidden todo')
+    await addButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.hiddenCreatedTodoId).toBeTruthy()
+    expect(wrapper.text()).toContain('The task was created, but it is hidden by the current filters')
+
+    const resetButton = wrapper.find('.info-banner-action')
+    await resetButton.trigger('click')
+
+    expect(wrapper.vm.hiddenCreatedTodoId).toBe(null)
+    expect(wrapper.vm.filters.status).toBe('')
+  })
+
+  it('prevents submitting reminder date later than due date', async () => {
+    const wrapper = await mountTodoList()
+    const createRows = wrapper.findAll('.create-form .create-row')
+    const titleInput = createRows[0].find('input[type="text"]')
+    const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
+    const remindAtInput = createRows[1].findAll('.localized-date-input-wrapper input')[1]
+    const addButton = createRows[1].find('button.btn-primary')
+
+    await titleInput.setValue('Broken reminder window')
+    await dueDateInput.setValue('2026-04-09')
+    await dueDateInput.trigger('blur')
+    await remindAtInput.setValue('2026-04-10')
+    await remindAtInput.trigger('input')
+    await addButton.trigger('click')
+    await flushPromises()
+
+    const createCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/todos' && options?.method === 'POST')
+    expect(createCall).toBeTruthy()
+    expect(JSON.parse(String(createCall?.[1]?.body)).remindAt).toBe('2026-04-09T00:00:00')
+  })
+
+  it('clamps reminder date to due date in create form inputs', async () => {
+    const wrapper = await mountTodoList()
+    const createRows = wrapper.findAll('.create-form .create-row')
+    const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
+    const remindAtInput = createRows[1].findAll('.localized-date-input-wrapper input')[1]
+
+    await dueDateInput.setValue('2026-04-09')
+    await dueDateInput.trigger('input')
+    await remindAtInput.setValue('2026-04-10')
+    await remindAtInput.trigger('input')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.newTodo.remindAt).toBe('2026-04-09')
+  })
+
+  it('shows info message when due date is moved earlier than reminder date', async () => {
+    const wrapper = await mountTodoList()
+    const createRows = wrapper.findAll('.create-form .create-row')
+    const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
+    const remindAtInput = createRows[1].findAll('.localized-date-input-wrapper input')[1]
+
+    await dueDateInput.setValue('2026-04-12')
+    await dueDateInput.trigger('input')
+    await remindAtInput.setValue('2026-04-11')
+    await remindAtInput.trigger('input')
+    await dueDateInput.setValue('2026-04-10')
+    await dueDateInput.trigger('input')
+    await flushPromises()
+
+    expect(wrapper.vm.newTodo.remindAt).toBe('2026-04-10')
+  })
+
+  it('does not show info message when reminder date itself is entered too late', async () => {
+    const wrapper = await mountTodoList()
+    const createRows = wrapper.findAll('.create-form .create-row')
+    const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
+    const remindAtInput = createRows[1].findAll('.localized-date-input-wrapper input')[1]
+
+    await dueDateInput.setValue('2026-04-10')
+    await dueDateInput.trigger('input')
+    await remindAtInput.setValue('2026-04-11')
+    await remindAtInput.trigger('input')
+    await flushPromises()
+
+    expect(wrapper.vm.newTodo.remindAt).toBe('2026-04-10')
+    expect(wrapper.text()).not.toContain('Reminder date was aligned to due date')
+    expect(wrapper.vm.infoMessage).toBe('')
+  })
+
+  it('clamps reminder date in edit mode when due date is moved earlier', async () => {
+    const wrapper = await mountTodoList()
+
+    await wrapper.find('.edit-btn').trigger('click')
+    await flushPromises()
+
+    const editRows = wrapper.findAll('.edit-row')
+    const dueDateInput = editRows[0].find('.localized-date-input-wrapper input')
+    const remindAtInput = editRows[0].findAll('.localized-date-input-wrapper input')[1]
+
+    await dueDateInput.setValue('2026-04-12')
+    await dueDateInput.trigger('input')
+    await remindAtInput.setValue('2026-04-11')
+    await remindAtInput.trigger('input')
+    await dueDateInput.setValue('2026-04-10')
+    await dueDateInput.trigger('input')
+    await flushPromises()
+
+    expect(wrapper.vm.editTodoForm.remindAt).toBe('2026-04-10')
+  })
+
+  it('dismisses info message when close button is clicked', async () => {
+    const wrapper = await mountTodoList()
+    wrapper.vm.infoMessage = 'The new task reminder date was aligned to the due date'
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.info-banner-close').trigger('click')
+
+    expect(wrapper.vm.infoMessage).toBe('')
+  })
+
   it('sends recurrence fields in create payload when recurrence is enabled', async () => {
     const wrapper = await mountTodoList()
     const createRows = wrapper.findAll('.create-form .create-row')
@@ -615,6 +853,8 @@ describe('TodoList reset behavior', () => {
 
   it('preserves layout stability during empty state transitions', async () => {
     fetchMock.mockImplementation(async (url, options) => {
+      if (url.includes('/api/todo-saved-views')) return { ok: true, json: async () => createSavedViewsResponse() }
+      if (url.includes('/api/todo-reminders')) return { ok: true, json: async () => createReminderPageResponse() }
       if (url.includes('/api/todos/options')) return { ok: true, json: async () => createOptionsResponse() }
       if (url.includes('/api/todos/stats/overview')) return { ok: true, json: async () => createStatsOverviewResponse() }
       if (url.includes('/api/todos/stats/by-category')) return { ok: true, json: async () => createStatsCategoryResponse() }
@@ -629,5 +869,18 @@ describe('TodoList reset behavior', () => {
 
     const todoList = wrapper.find('.todo-list')
     expect(todoList.exists()).toBe(true)
+  })
+
+  it('restores filters from popstate events', async () => {
+    const wrapper = await mountTodoList()
+
+    window.history.replaceState({}, '', '/?status=DONE&keyword=retro')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await flushPromises()
+
+    expect(wrapper.vm.filters).toMatchObject({
+      status: 'DONE',
+      keyword: 'retro',
+    })
   })
 })

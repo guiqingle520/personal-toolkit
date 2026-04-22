@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import TodoToolbar from './todo/TodoToolbar.vue'
@@ -11,7 +11,9 @@ import TodoEmptyState from './todo/TodoEmptyState.vue'
 import TodoPagination from './todo/TodoPagination.vue'
 import TodoItemsList from './todo/TodoItemsList.vue'
 import TodoKanbanView from './todo/TodoKanbanView.vue'
-import type { PageData, TodoDraft, TodoFiltersModel, TodoItem, TodoOptions, TodoSubItem, TodoSubItemSummary, TodoStatsOverview, TodoStatsCategoryItem, TodoStatsTrend, TodoStatsTrendItem } from './todo/types'
+import TodoReminderPanel from './todo/TodoReminderPanel.vue'
+import TodoSavedViewsBar from './todo/TodoSavedViewsBar.vue'
+import type { PageData, TodoDraft, TodoFiltersModel, TodoItem, TodoOptions, TodoReminderItem, TodoSavedView, TodoSubItem, TodoSubItemSummary, TodoStatsOverview, TodoStatsCategoryItem, TodoStatsTrend, TodoStatsTrendItem } from './todo/types'
 
 function handleSelectedUpdate(id: number, selected: boolean) {
   if (selected) {
@@ -25,7 +27,12 @@ function handleSelectedUpdate(id: number, selected: boolean) {
 
 import { persistLocale, syncDocumentLocale, type AppLocale } from '../i18n'
 import {
+  createDefaultTodoFilters,
   formatDateForInput,
+  hasMeaningfulTodoQuery,
+  isReminderAfterDueDate,
+  parseTodoUrlState,
+  serializeTodoUrlState,
   toDateTimeValue,
 } from '../utils/todoView'
 import { fetchApi } from '../api'
@@ -38,11 +45,16 @@ const pageData = ref<PageData<TodoItem> | null>(null)
 const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+const infoMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
 
 const statsOverview = ref<TodoStatsOverview | null>(null)
 const statsCategories = ref<TodoStatsCategoryItem[]>([])
 const statsTrend = ref<TodoStatsTrendItem[]>([])
+const reminders = ref<TodoReminderItem[]>([])
+const reminderLoading = ref(false)
+const savedViews = ref<TodoSavedView[]>([])
+const hasAppliedDefaultSavedView = ref(false)
 
 const CATEGORY_LIST_ID = 'category-options'
 const TAG_LIST_ID = 'tag-options'
@@ -82,23 +94,7 @@ const editTodoForm = ref<TodoDraft>({
   recurrenceEndTime: ''
 })
 
-const filters = ref<TodoFiltersModel>({
-  page: 0,
-  size: 10,
-  status: '',
-  priority: '',
-  category: '',
-  keyword: '',
-  tag: '',
-  recurrenceType: '',
-  timePreset: '',
-  dueDateFrom: '',
-  dueDateTo: '',
-  remindDateFrom: '',
-  remindDateTo: '',
-  sortBy: 'createTime',
-  sortDir: 'DESC'
-})
+const filters = ref<TodoFiltersModel>(createDefaultTodoFilters())
 
 const pendingCount = computed(() => todos.value.filter(t => t.status !== 'DONE').length)
 
@@ -114,6 +110,9 @@ const checklistDraftByTodoId = ref<Record<number, string>>({})
 const checklistLoadingTodoIds = ref<number[]>([])
 const checklistCreatingTodoIds = ref<number[]>([])
 const checklistPendingSubItemIdsByTodoId = ref<Record<number, number[]>>({})
+const syncingFromUrl = ref(false)
+let infoMessageTimer: ReturnType<typeof setTimeout> | null = null
+const hiddenCreatedTodoId = ref<number | null>(null)
 
 const isAllSelected = computed({
   get: () => todos.value.length > 0 && selectedIds.value.length === todos.value.length,
@@ -133,6 +132,7 @@ watch(viewMode, () => {
     statsCategories.value = []
     statsTrend.value = []
   }
+  syncUrlState(false)
   loadTodos()
 })
 
@@ -145,12 +145,22 @@ function handleLocaleUpdate(nextLocale: AppLocale) {
   locale.value = nextLocale
 }
 
+function handleDisplayModeUpdate(nextDisplayMode: 'LIST' | 'KANBAN') {
+  displayMode.value = viewMode.value === 'ACTIVE' ? nextDisplayMode : 'LIST'
+  syncUrlState(false)
+}
+
+function handleViewModeUpdate(nextViewMode: 'ACTIVE' | 'RECYCLE_BIN') {
+  viewMode.value = nextViewMode
+}
+
 function handleFiltersUpdate(nextFilters: TodoFiltersModel) {
   selectedIds.value = []
   filters.value = {
     ...nextFilters,
     page: 0
   }
+  syncUrlState(false)
 }
 
 function handleNewTodoUpdate(nextDraft: TodoDraft) {
@@ -159,6 +169,108 @@ function handleNewTodoUpdate(nextDraft: TodoDraft) {
 
 function handleEditFormUpdate(nextDraft: TodoDraft) {
   editTodoForm.value = nextDraft
+}
+
+function showInfoMessage(message: string) {
+  infoMessage.value = message
+  if (infoMessageTimer) {
+    clearTimeout(infoMessageTimer)
+  }
+  infoMessageTimer = setTimeout(() => {
+    infoMessage.value = ''
+    hiddenCreatedTodoId.value = null
+    infoMessageTimer = null
+  }, 2500)
+}
+
+function dismissInfoMessage() {
+  infoMessage.value = ''
+  hiddenCreatedTodoId.value = null
+  if (infoMessageTimer) {
+    clearTimeout(infoMessageTimer)
+    infoMessageTimer = null
+  }
+}
+
+function clearFiltersAndRevealCreatedTodo() {
+  hiddenCreatedTodoId.value = null
+  dismissInfoMessage()
+  resetFilters()
+}
+
+function todoMatchesCurrentFilters(todo: TodoItem) {
+  if (filters.value.status && (todo.status || '').toUpperCase() !== filters.value.status.toUpperCase()) {
+    return false
+  }
+
+  if (filters.value.priority && String(todo.priority || '') !== String(filters.value.priority)) {
+    return false
+  }
+
+  if (filters.value.category && (todo.category || '').trim().toLowerCase() !== filters.value.category.trim().toLowerCase()) {
+    return false
+  }
+
+  if (filters.value.keyword) {
+    const keyword = filters.value.keyword.trim().toLowerCase()
+    const haystack = [todo.title, todo.category, todo.tags].filter(Boolean).join(' ').toLowerCase()
+    if (!haystack.includes(keyword)) {
+      return false
+    }
+  }
+
+  if (filters.value.tag) {
+    const tag = filters.value.tag.trim().toLowerCase()
+    if (!(todo.tags || '').toLowerCase().includes(tag)) {
+      return false
+    }
+  }
+
+  if (filters.value.recurrenceType && (todo.recurrenceType || '').toUpperCase() !== filters.value.recurrenceType.toUpperCase()) {
+    return false
+  }
+
+  if (filters.value.timePreset) {
+    const now = new Date()
+    const dueDate = todo.dueDate ? new Date(todo.dueDate) : null
+    const remindAt = todo.remindAt ? new Date(todo.remindAt) : null
+    switch (filters.value.timePreset) {
+      case 'DUE_TODAY': {
+        if (!dueDate) return false
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const dueDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+        if (today.getTime() !== dueDay.getTime()) return false
+        break
+      }
+      case 'OVERDUE': {
+        if ((todo.status || '').toUpperCase() === 'DONE' || !dueDate || dueDate >= now) return false
+        break
+      }
+      case 'UPCOMING_REMINDER': {
+        const nextDay = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+        if ((todo.status || '').toUpperCase() === 'DONE' || !remindAt || remindAt < now || remindAt > nextDay) return false
+        break
+      }
+    }
+  }
+
+  if (filters.value.dueDateFrom && (!todo.dueDate || todo.dueDate < `${filters.value.dueDateFrom}T00:00:00`)) {
+    return false
+  }
+
+  if (filters.value.dueDateTo && (!todo.dueDate || todo.dueDate > `${filters.value.dueDateTo}T23:59:59`)) {
+    return false
+  }
+
+  if (filters.value.remindDateFrom && (!todo.remindAt || todo.remindAt < `${filters.value.remindDateFrom}T00:00:00`)) {
+    return false
+  }
+
+  if (filters.value.remindDateTo && (!todo.remindAt || todo.remindAt > `${filters.value.remindDateTo}T23:59:59`)) {
+    return false
+  }
+
+  return true
 }
 
 function reconcileSelectedIds() {
@@ -287,31 +399,234 @@ async function loadTodos() {
   }
 }
 
+async function loadReminders() {
+  reminderLoading.value = true
+  try {
+    const response = await fetchApi<PageData<TodoReminderItem>>('/api/todo-reminders?status=SENT&page=0&size=10')
+    reminders.value = response.data?.content || []
+  } catch (error) {
+    handleError(error)
+  } finally {
+    reminderLoading.value = false
+  }
+}
+
+function serializableFilters() {
+  return {
+    status: filters.value.status,
+    priority: filters.value.priority,
+    category: filters.value.category,
+    keyword: filters.value.keyword,
+    tag: filters.value.tag,
+    recurrenceType: filters.value.recurrenceType,
+    timePreset: filters.value.timePreset,
+    dueDateFrom: filters.value.dueDateFrom,
+    dueDateTo: filters.value.dueDateTo,
+    remindDateFrom: filters.value.remindDateFrom,
+    remindDateTo: filters.value.remindDateTo,
+    sortBy: filters.value.sortBy,
+    sortDir: filters.value.sortDir,
+  }
+}
+
+async function loadSavedViews() {
+  try {
+    const response = await fetchApi<TodoSavedView[]>('/api/todo-saved-views')
+    savedViews.value = response.data || []
+    return savedViews.value
+  } catch (error) {
+    handleError(error)
+    return []
+  }
+}
+
+function applySavedView(savedView: TodoSavedView, options: { skipLoad?: boolean } = {}) {
+  filters.value = {
+    ...filters.value,
+    status: savedView.filters.status || '',
+    priority: savedView.filters.priority || '',
+    category: savedView.filters.category || '',
+    keyword: savedView.filters.keyword || '',
+    tag: savedView.filters.tag || '',
+    recurrenceType: savedView.filters.recurrenceType || '',
+    timePreset: savedView.filters.timePreset || '',
+    dueDateFrom: savedView.filters.dueDateFrom || '',
+    dueDateTo: savedView.filters.dueDateTo || '',
+    remindDateFrom: savedView.filters.remindDateFrom || '',
+    remindDateTo: savedView.filters.remindDateTo || '',
+    sortBy: savedView.filters.sortBy || 'createTime',
+    sortDir: savedView.filters.sortDir || 'DESC',
+    page: 0,
+  }
+  syncUrlState(false)
+  if (!options.skipLoad) {
+    loadTodos()
+  }
+}
+
+function currentUrlState() {
+  return {
+    filters: filters.value,
+    viewMode: viewMode.value,
+    displayMode: displayMode.value,
+  }
+}
+
+function syncUrlState(replace: boolean) {
+  if (typeof window === 'undefined' || syncingFromUrl.value) {
+    return
+  }
+
+  const query = serializeTodoUrlState(currentUrlState())
+  const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname
+  const currentUrl = `${window.location.pathname}${window.location.search}`
+  if (nextUrl === currentUrl) {
+    return
+  }
+
+  const state = currentUrlState()
+  if (replace) {
+    window.history.replaceState(state, '', nextUrl)
+  } else {
+    window.history.pushState(state, '', nextUrl)
+  }
+}
+
+function applyUrlState(search: string, options: { skipLoad?: boolean } = {}) {
+  syncingFromUrl.value = true
+  const parsedState = parseTodoUrlState(search)
+  filters.value = parsedState.filters
+  viewMode.value = parsedState.viewMode
+  displayMode.value = parsedState.displayMode
+  syncingFromUrl.value = false
+
+  if (!options.skipLoad) {
+    loadTodos()
+  }
+}
+
+function handlePopState() {
+  applyUrlState(window.location.search)
+}
+
+async function initializeTodoPage() {
+  loadOptions()
+  loadReminders()
+
+  const hasUrlState = typeof window !== 'undefined' && hasMeaningfulTodoQuery(window.location.search)
+  if (hasUrlState) {
+    applyUrlState(window.location.search, { skipLoad: true })
+  }
+
+  const loadedSavedViews = await loadSavedViews()
+  if (!hasAppliedDefaultSavedView.value && !hasUrlState) {
+    const defaultSavedView = loadedSavedViews.find((savedView) => savedView.isDefault)
+    if (defaultSavedView) {
+      applySavedView(defaultSavedView, { skipLoad: true })
+    }
+    hasAppliedDefaultSavedView.value = true
+  } else {
+    hasAppliedDefaultSavedView.value = true
+  }
+
+  syncUrlState(true)
+  await loadTodos()
+}
+
+async function saveCurrentView() {
+  const name = window.prompt(t('savedViews.promptName'))?.trim()
+  if (!name) return
+
+  try {
+    await fetchApi<TodoSavedView>('/api/todo-saved-views', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        isDefault: false,
+        filters: serializableFilters(),
+      }),
+    })
+    await loadSavedViews()
+  } catch (error) {
+    handleError(error)
+  }
+}
+
+async function renameSavedView(savedView: TodoSavedView) {
+  const name = window.prompt(t('savedViews.promptRename'), savedView.name)?.trim()
+  if (!name) return
+
+  try {
+    await fetchApi<TodoSavedView>(`/api/todo-saved-views/${savedView.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name,
+        isDefault: savedView.isDefault,
+        filters: savedView.filters,
+      }),
+    })
+    await loadSavedViews()
+  } catch (error) {
+    handleError(error)
+  }
+}
+
+async function deleteSavedView(id: number) {
+  if (!window.confirm(t('savedViews.confirmDelete'))) return
+  try {
+    await fetchApi(`/api/todo-saved-views/${id}`, { method: 'DELETE' })
+    await loadSavedViews()
+  } catch (error) {
+    handleError(error)
+  }
+}
+
+async function setDefaultSavedView(id: number) {
+  try {
+    await fetchApi(`/api/todo-saved-views/${id}/default`, { method: 'POST' })
+    await loadSavedViews()
+  } catch (error) {
+    handleError(error)
+  }
+}
+
+async function markReminderAsRead(id: number) {
+  try {
+    await fetchApi(`/api/todo-reminders/${id}/read`, { method: 'POST' })
+    await Promise.all([loadReminders(), loadStats()])
+  } catch (error) {
+    handleError(error)
+  }
+}
+
+async function markAllRemindersAsRead() {
+  try {
+    await fetchApi('/api/todo-reminders/read-all', { method: 'POST' })
+    await Promise.all([loadReminders(), loadStats()])
+  } catch (error) {
+    handleError(error)
+  }
+}
+
+function openReminderTodo(todoId: number) {
+  displayMode.value = 'LIST'
+  const targetTodo = todos.value.find((todo) => todo.id === todoId)
+  if (targetTodo) {
+    startEdit(targetTodo)
+  }
+}
+
 function resetFilters() {
   selectedIds.value = []
-  filters.value = {
-    page: 0,
-    size: 10,
-    status: '',
-    priority: '',
-    category: '',
-    keyword: '',
-    tag: '',
-    recurrenceType: '',
-    timePreset: '',
-    dueDateFrom: '',
-    dueDateTo: '',
-    remindDateFrom: '',
-    remindDateTo: '',
-    sortBy: 'createTime',
-    sortDir: 'DESC'
-  }
+  filters.value = createDefaultTodoFilters()
+  syncUrlState(false)
   loadTodos()
 }
 
 function prevPage() {
   if (pageData.value && !pageData.value.first) {
     filters.value.page--
+    syncUrlState(false)
     loadTodos()
   }
 }
@@ -319,12 +634,19 @@ function prevPage() {
 function nextPage() {
   if (pageData.value && !pageData.value.last) {
     filters.value.page++
+    syncUrlState(false)
     loadTodos()
   }
 }
 
 async function createTodo() {
   if (!newTodo.value.title.trim()) return
+
+  if (isReminderAfterDueDate(newTodo.value.remindAt, newTodo.value.dueDate)) {
+    errorMessage.value = t('feedback.reminderAfterDueDate')
+    validationErrors.value = {}
+    return
+  }
   
   submitting.value = true
   errorMessage.value = ''
@@ -349,12 +671,18 @@ async function createTodo() {
           recurrenceEndTime: newTodo.value.recurrenceType ? toDateTimeValue(newTodo.value.recurrenceEndTime || '') : undefined
         }
     
-    await fetchApi<TodoItem>('/api/todos', {
+    const createdResponse = await fetchApi<TodoItem>('/api/todos', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
+
+    const createdTodo = createdResponse.data || null
     
     await loadTodos()
+    if (createdTodo && !todoMatchesCurrentFilters(createdTodo)) {
+      hiddenCreatedTodoId.value = createdTodo.id
+      showInfoMessage(t('feedback.createdTodoHiddenByFilters'))
+    }
     newTodo.value = { title: '', priority: 3, category: '', dueDate: '', remindAt: '', tags: '', notes: '', attachmentLinks: '', ownerLabel: '', collaborators: '', watchers: '', recurrenceType: '', recurrenceInterval: 1, recurrenceEndTime: '' }
   } catch (error) {
     handleError(error)
@@ -390,6 +718,12 @@ function cancelEdit() {
 async function saveEdit(todo: TodoItem) {
   if (!editTodoForm.value.title.trim()) {
     cancelEdit()
+    return
+  }
+
+  if (isReminderAfterDueDate(editTodoForm.value.remindAt, editTodoForm.value.dueDate)) {
+    errorMessage.value = t('feedback.reminderAfterDueDate')
+    validationErrors.value = {}
     return
   }
   
@@ -484,7 +818,21 @@ async function deleteTodo(id: number) {
   }
 }
 
-onMounted(() => { loadTodos(); loadOptions(); })
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('popstate', handlePopState)
+  }
+  initializeTodoPage()
+})
+
+onBeforeUnmount(() => {
+  if (infoMessageTimer) {
+    clearTimeout(infoMessageTimer)
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('popstate', handlePopState)
+  }
+})
 
 async function loadOptions() {
   try {
@@ -659,7 +1007,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
       <div class="workbench-top">
         <TodoToolbar
           :displayMode="displayMode"
-          @update:displayMode="displayMode = $event" 
+          @update:displayMode="handleDisplayModeUpdate" 
           :pageData="pageData" 
           :pendingCount="pendingCount"
           :loading="loading"
@@ -668,7 +1016,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
           :locale="locale as AppLocale"
           @refresh="loadTodos"
           @update:locale="handleLocaleUpdate"
-          @update:viewMode="viewMode = $event"
+          @update:viewMode="handleViewModeUpdate"
           @update:showOptionsPanel="showOptionsPanel = $event"
         />
 
@@ -689,6 +1037,24 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             :trend="statsTrend"
           />
 
+          <TodoReminderPanel
+            v-if="viewMode === 'ACTIVE'"
+            :reminders="reminders"
+            :loading="reminderLoading"
+            @mark-read="markReminderAsRead"
+            @mark-all-read="markAllRemindersAsRead"
+            @open-todo="openReminderTodo"
+          />
+
+          <TodoSavedViewsBar
+            v-if="viewMode === 'ACTIVE'"
+            :savedViews="savedViews"
+            @apply="applySavedView"
+            @set-default="setDefaultSavedView"
+            @rename="renameSavedView"
+            @delete="deleteSavedView"
+          />
+
           <TodoFilters 
             v-if="displayMode === 'LIST'"
             :filters="filters"
@@ -697,6 +1063,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             @update:filters="handleFiltersUpdate"
             @loadTodos="loadTodos"
             @resetFilters="resetFilters"
+            @saveCurrentView="saveCurrentView"
           />
         </aside>
 
@@ -724,6 +1091,14 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
               </li>
             </ul>
           </div>
+
+          <Transition name="fade-banner">
+            <div v-if="infoMessage" class="info-banner">
+              <span>{{ infoMessage }}</span>
+              <button v-if="hiddenCreatedTodoId" type="button" class="btn btn-sm btn-outline info-banner-action" @click="clearFiltersAndRevealCreatedTodo">{{ $t('filter.reset') }}</button>
+              <button type="button" class="info-banner-close" :aria-label="$t('action.closeInfo')" @click="dismissInfoMessage">×</button>
+            </div>
+          </Transition>
 
           <TodoEmptyState 
             :loading="loading"

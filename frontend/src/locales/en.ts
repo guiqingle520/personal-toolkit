@@ -23,6 +23,17 @@ const en = {
     knownTags: 'Known Tags',
     noTags: 'No tags found.',
   },
+  savedViews: {
+    title: 'Saved Views',
+    saveCurrent: 'Save current view',
+    defaultBadge: 'Default',
+    setDefault: 'Set default',
+    rename: 'Rename',
+    delete: 'Delete',
+    promptName: 'Enter a name for this view',
+    promptRename: 'Enter a new name for this view',
+    confirmDelete: 'Delete this saved view?'
+  },
   filter: {
     search: 'Search keyword...',
     allStatus: 'All Status',
@@ -92,6 +103,7 @@ const en = {
     edit: 'Edit',
     delete: 'Delete',
     restore: 'Restore',
+    closeInfo: 'Dismiss notice',
     showChecklist: 'Show checklist',
     hideChecklist: 'Hide checklist',
     confirmDeleteSingle: 'Are you sure you want to delete this task?',
@@ -106,7 +118,12 @@ const en = {
   feedback: {
     genericError: 'An error occurred',
     unexpectedError: 'An unexpected error occurred',
-    httpError: 'HTTP Error {status}'
+    httpError: 'HTTP Error {status}',
+    reminderAfterDueDate: 'Reminder date cannot be later than due date',
+    reminderAlignedToDueDate: 'Reminder date was aligned to due date',
+    createReminderAlignedToDueDate: 'The new task reminder date was aligned to the due date',
+    editReminderAlignedToDueDate: 'The edited reminder date was aligned to the due date',
+    createdTodoHiddenByFilters: 'The task was created, but it is hidden by the current filters. Reset filters to see it.'
   },
   pagination: {
     prev: '← Prev',
@@ -124,10 +141,16 @@ const en = {
     completedAt: 'Completed: {time}'
   },
   reminder: {
+    panelTitle: 'Inbox Reminders',
     remindAt: 'Reminder Date',
     remindFrom: 'Reminder From',
     remindTo: 'Reminder To',
-    scheduledAt: 'Reminder: {time}'
+    scheduledAt: 'Reminder: {time}',
+    scheduledAtLabel: 'Reminder time: {time}',
+    empty: 'No unread reminders',
+    markRead: 'Mark as read',
+    markAllRead: 'Mark all as read',
+    openTodo: 'Open todo'
   },
   collaboration: {
     ownerLabel: 'Owner: {value}',
@@ -141,6 +164,7 @@ const en = {
     overdueCount: 'Overdue Tasks',
     activeCount: 'Active Tasks',
     upcomingReminderCount: 'Upcoming Reminders',
+    unreadReminderCount: 'Unread Reminders',
     categoryStats: 'Category Stats',
     trend7d: '7-Day Trend',
     uncategorized: 'Uncategorized',

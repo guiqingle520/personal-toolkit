@@ -28,6 +28,8 @@
 - ✅ 登录失败按 IP / 账号标识限流
 - ✅ Todo 数据按账号隔离
 - ✅ Todo 提醒时间
+- ✅ Todo 站内提醒列表 / 已读 / 全部已读
+- ✅ Todo Saved Views（保存筛选 / 设默认 / 重命名 / 删除）
 - ✅ 完整的 CRUD 操作（创建、查询、更新、删除）
 - ✅ 任务状态管理（待处理/已完成）
 - ✅ 分页、筛选与回收站
@@ -428,12 +430,29 @@ docker compose down -v
 
 - 仅在活动任务页展示
 - 支持概览统计、分类统计、最近 7 天完成趋势
+- 概览卡片额外展示未来 24 小时即将提醒数与未读提醒数
 
 ### 1.4 看板视图
 
 - 活动任务页支持列表视图 / 静态看板视图切换
 - 当前看板首版按“待办 / 已完成”静态分列
 - 当前不支持拖拽改状态
+
+### 1.6 站内提醒
+
+- Todo 设置 `remindAt` 后，后端会自动同步对应提醒事件
+- 后端默认每 60 秒扫描一次到点提醒，并将其投递到站内未读列表
+- 活动任务页左侧会显示提醒面板
+- 支持单条已读、全部已读和跳转回对应任务
+- 当前不支持邮件、短信或企业 IM 推送
+
+### 1.7 Saved Views
+
+- 支持将当前筛选条件保存为命名视图
+- 支持应用、设为默认、重命名、删除
+- 页面初始化时会优先尝试应用默认视图
+- 当前只保存白名单筛选字段，不保存分页参数
+- 当前不支持共享视图
 
 ### 2. 创建任务
 
@@ -688,6 +707,10 @@ GET /api/todos?recurrenceType=DAILY&timePreset=OVERDUE&page=0&size=10
 GET /api/todos/stats/overview
 ```
 
+**补充说明**
+
+- 当前响应除 `todayCompleted / weekCompleted / overdueCount / activeCount / upcomingReminderCount` 外，还包含 `unreadReminderCount`
+
 #### 4. 查询分类统计
 
 **请求**
@@ -700,6 +723,97 @@ GET /api/todos/stats/by-category
 **请求**
 ```http
 GET /api/todos/stats/trend?range=7d
+```
+
+---
+
+#### 5.1 查询站内提醒列表
+
+**请求**
+```http
+GET /api/todo-reminders?status=SENT&page=0&size=10
+```
+
+**说明**
+
+- `status` 可选，当前支持 `PENDING / SENT / READ / CANCELLED`
+- 前端当前默认查询 `SENT`，即未读提醒列表
+
+#### 5.2 查询提醒统计
+
+**请求**
+```http
+GET /api/todo-reminders/stats
+```
+
+**响应字段**
+
+- `unreadCount`：当前用户未读提醒数量
+
+#### 5.3 标记单条提醒已读
+
+**请求**
+```http
+POST /api/todo-reminders/{id}/read
+```
+
+#### 5.4 全部提醒标记已读
+
+**请求**
+```http
+POST /api/todo-reminders/read-all
+```
+
+---
+
+#### 5.5 查询保存视图列表
+
+**请求**
+```http
+GET /api/todo-saved-views
+```
+
+#### 5.6 创建保存视图
+
+**请求**
+```http
+POST /api/todo-saved-views
+Content-Type: application/json
+```
+
+**请求体示例**
+```json
+{
+  "name": "Ops Focus",
+  "isDefault": true,
+  "filters": {
+    "status": "PENDING",
+    "keyword": "release",
+    "sortBy": "createTime",
+    "sortDir": "DESC"
+  }
+}
+```
+
+#### 5.7 更新保存视图
+
+**请求**
+```http
+PUT /api/todo-saved-views/{id}
+```
+
+#### 5.8 删除保存视图
+
+**请求**
+```http
+DELETE /api/todo-saved-views/{id}
+```
+
+#### 5.9 设为默认视图
+
+**请求**
+```http
+POST /api/todo-saved-views/{id}/default
 ```
 
 ---
@@ -767,6 +881,7 @@ Content-Type: application/json
 **字段说明**
 - `title`: 任务标题（必填，最大 200 字符）
 - `status`: 任务状态（必填，只能是 `PENDING` 或 `DONE`）
+- `remindAt`: 可选，设置后会参与站内提醒事件生成
 
 **响应** (201 Created)
 ```json

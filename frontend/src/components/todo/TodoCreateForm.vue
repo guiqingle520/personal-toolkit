@@ -28,7 +28,7 @@ defineEmits<{
     </div>
     <div class="create-row">
       <LocalizedDateInput :modelValue="newTodo.dueDate" class="cyber-input" :disabled="submitting" @update:modelValue="$emit('update:newTodo', { ...newTodo, dueDate: $event })" />
-      <LocalizedDateInput :modelValue="newTodo.remindAt" :placeholder="$t('reminder.remindAt')" class="cyber-input" :disabled="submitting" @update:modelValue="$emit('update:newTodo', { ...newTodo, remindAt: $event })" />
+      <LocalizedDateInput :modelValue="newTodo.remindAt" :max="newTodo.dueDate || undefined" :placeholder="$t('reminder.remindAt')" class="cyber-input" :disabled="submitting" @update:modelValue="$emit('update:newTodo', { ...newTodo, remindAt: $event })" />
       <input :value="newTodo.tags" type="text" :placeholder="$t('form.tagsCsv')" class="cyber-input flex-2" :list="tagListId" :disabled="submitting" @input="$emit('update:newTodo', { ...newTodo, tags: ($event.target as HTMLInputElement).value })" @keyup.enter="$emit('createTodo')" />
       <select :value="newTodo.recurrenceType || ''" class="cyber-input" :disabled="submitting" @change="$emit('update:newTodo', { ...newTodo, recurrenceType: ($event.target as HTMLSelectElement).value || undefined })">
         <option value="">{{ $t('recurrence.none') }}</option>

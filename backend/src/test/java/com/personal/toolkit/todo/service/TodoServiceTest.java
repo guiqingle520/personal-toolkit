@@ -68,6 +68,9 @@ class TodoServiceTest {
     @Mock
     private AppUserRepository appUserRepository;
 
+    @Mock
+    private TodoReminderService todoReminderService;
+
     private TodoService todoService;
 
     @BeforeEach
@@ -78,7 +81,8 @@ class TodoServiceTest {
                 redisTemplate,
                 new ObjectMapper(),
                 currentUserProvider,
-                appUserRepository
+                appUserRepository,
+                todoReminderService
         );
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
     }
@@ -247,6 +251,7 @@ class TodoServiceTest {
         when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(eq(USER_ID), eq("DONE"), any(LocalDateTime.class))).thenReturn(3L);
         when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(11L);
         when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndRemindAtBetween(eq(USER_ID), eq("DONE"), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(5L);
+        when(todoReminderService.countUnreadReminders(USER_ID)).thenReturn(4L);
 
         TodoStatsOverviewResponse response = todoService.getStatsOverview();
 
@@ -255,6 +260,7 @@ class TodoServiceTest {
         assertEquals(3L, response.getOverdueCount());
         assertEquals(11L, response.getActiveCount());
         assertEquals(5L, response.getUpcomingReminderCount());
+        assertEquals(4L, response.getUnreadReminderCount());
     }
 
     /**

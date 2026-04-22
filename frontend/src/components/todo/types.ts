@@ -100,6 +100,29 @@ export interface TodoStatsOverview {
   overdueCount: number
   activeCount: number
   upcomingReminderCount: number
+  unreadReminderCount: number
+}
+
+export interface TodoReminderItem {
+  id: number
+  todoId: number
+  todoTitle: string
+  todoStatus?: string
+  category?: string
+  dueDate?: string
+  scheduledAt: string
+  status: string
+  sentAt?: string
+  readAt?: string
+}
+
+export interface TodoSavedView {
+  id: number
+  name: string
+  isDefault: boolean
+  filters: Partial<Record<keyof TodoFiltersModel, string>>
+  createTime: string
+  updateTime: string
 }
 
 export interface TodoStatsCategoryItem {

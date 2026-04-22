@@ -49,6 +49,10 @@ const maxTrendValue = computed(() => {
         <div class="stat-label">{{ t('stats.upcomingReminderCount') }}</div>
         <div class="stat-value text-info">{{ overview.upcomingReminderCount }}</div>
       </div>
+      <div class="stat-box">
+        <div class="stat-label">{{ t('stats.unreadReminderCount') }}</div>
+        <div class="stat-value text-info">{{ overview.unreadReminderCount }}</div>
+      </div>
     </div>
 
     <div class="stats-row">

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createDefaultTodoFilters,
   formatDateForInput,
+  hasMeaningfulTodoQuery,
+  isReminderAfterDueDate,
+  parseTodoUrlState,
   formatPriorityLabel,
   formatRecurrenceLabelKey,
   parseTags,
   priorityBadgeClass,
+  serializeTodoUrlState,
   toDateTimeValue,
 } from './todoView'
 
@@ -47,5 +52,36 @@ describe('todoView helpers', () => {
     expect(formatRecurrenceLabelKey('DAILY')).toBe('recurrence.daily')
     expect(formatRecurrenceLabelKey('weekly')).toBe('recurrence.weekly')
     expect(formatRecurrenceLabelKey(undefined)).toBe('recurrence.none')
+  })
+
+  it('serializes meaningful todo filters into query string', () => {
+    const filters = createDefaultTodoFilters()
+    filters.status = 'PENDING'
+    filters.keyword = 'release'
+    filters.page = 2
+
+    expect(serializeTodoUrlState({ filters, viewMode: 'ACTIVE', displayMode: 'KANBAN' })).toBe('page=2&status=PENDING&keyword=release&displayMode=KANBAN')
+  })
+
+  it('parses todo state from query string', () => {
+    const parsed = parseTodoUrlState('?status=DONE&keyword=retro&page=3&viewMode=RECYCLE_BIN')
+
+    expect(parsed.filters.status).toBe('DONE')
+    expect(parsed.filters.keyword).toBe('retro')
+    expect(parsed.filters.page).toBe(3)
+    expect(parsed.viewMode).toBe('RECYCLE_BIN')
+    expect(parsed.displayMode).toBe('LIST')
+  })
+
+  it('detects when URL contains meaningful todo query params', () => {
+    expect(hasMeaningfulTodoQuery('?status=PENDING')).toBe(true)
+    expect(hasMeaningfulTodoQuery('?displayMode=KANBAN')).toBe(true)
+    expect(hasMeaningfulTodoQuery('')).toBe(false)
+  })
+
+  it('checks reminder date is not after due date', () => {
+    expect(isReminderAfterDueDate('2026-04-10', '2026-04-09')).toBe(true)
+    expect(isReminderAfterDueDate('2026-04-09', '2026-04-09')).toBe(false)
+    expect(isReminderAfterDueDate('', '2026-04-09')).toBe(false)
   })
 })

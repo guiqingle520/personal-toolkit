@@ -14,6 +14,8 @@ const props = defineProps<{
   disabled?: boolean
   placeholder?: string
   class?: string
+  min?: string
+  max?: string
 }>()
 
 const emit = defineEmits<{
@@ -181,6 +183,40 @@ function isSelected(date: Date): boolean {
   return sameDate(date, selected)
 }
 
+function isWithinBounds(date: Date): boolean {
+  const minDate = parseYmd(props.min)
+  const maxDate = parseYmd(props.max)
+
+  if (minDate && date < minDate) {
+    return false
+  }
+
+  if (maxDate && date > maxDate) {
+    return false
+  }
+
+  return true
+}
+
+function clampDateValue(value: string | null | undefined): string {
+  const parsed = parseYmd(value)
+  if (!parsed) {
+    return value || ''
+  }
+
+  const minDate = parseYmd(props.min)
+  if (minDate && parsed < minDate) {
+    return toYmd(minDate)
+  }
+
+  const maxDate = parseYmd(props.max)
+  if (maxDate && parsed > maxDate) {
+    return toYmd(maxDate)
+  }
+
+  return toYmd(parsed)
+}
+
 function isFocused(date: Date): boolean {
   return sameDate(date, focusedDate.value)
 }
@@ -261,6 +297,10 @@ function emitDateChange(dateValue: string): void {
 
 function selectDate(date: Date): void {
   if (props.disabled) {
+    return
+  }
+
+  if (!isWithinBounds(date)) {
     return
   }
 
@@ -378,23 +418,35 @@ function handleGlobalEscape(event: KeyboardEvent): void {
 
 function handleNativeInput(event: Event): void {
   const target = event.target as HTMLInputElement
-  selectedDateStr.value = target.value || null
-  emit('update:modelValue', target.value)
+  const nextValue = clampDateValue(target.value)
+  target.value = nextValue
+  selectedDateStr.value = nextValue || null
+  emit('update:modelValue', nextValue)
 }
 
 function handleNativeChange(event: Event): void {
   const target = event.target as HTMLInputElement
-  emit('change', target.value)
+  const nextValue = clampDateValue(target.value)
+  target.value = nextValue
+  emit('change', nextValue)
 }
 
 watch(() => props.modelValue, (newVal) => {
-  selectedDateStr.value = newVal || null
+  const normalizedValue = clampDateValue(newVal)
+  selectedDateStr.value = normalizedValue || null
 
-  const parsed = parseYmd(newVal)
+  const parsed = parseYmd(normalizedValue)
   if (parsed) {
     viewDate.value = new Date(parsed.getFullYear(), parsed.getMonth(), 1)
   }
 }, { immediate: true })
+
+watch(() => [props.min, props.max], () => {
+  const normalizedValue = clampDateValue(selectedDateStr.value)
+  if (normalizedValue !== (selectedDateStr.value || '')) {
+    emitDateChange(normalizedValue)
+  }
+})
 
 watch(locale, () => {
   if (isOpen.value) {
@@ -421,6 +473,8 @@ onUnmounted(() => {
       type="date"
       class="native-sync-input"
       :value="props.modelValue || ''"
+      :min="props.min"
+      :max="props.max"
       :disabled="props.disabled"
       @input="handleNativeInput"
       @change="handleNativeChange"
@@ -487,12 +541,14 @@ onUnmounted(() => {
           class="day-cell"
           :class="{
             'is-outside': !cell.inCurrentMonth,
+            'is-disabled': !isWithinBounds(cell.date),
             'is-today': isToday(cell.date),
             'is-selected': isSelected(cell.date),
             'is-focused': isFocused(cell.date),
           }"
           :data-date="cell.key"
           :aria-selected="isSelected(cell.date)"
+          :disabled="!isWithinBounds(cell.date)"
           :aria-current="isToday(cell.date) ? 'date' : undefined"
           @click.stop="selectDate(cell.date)"
           @focus="focusedDate = cell.date"
@@ -679,6 +735,16 @@ onUnmounted(() => {
 
 .day-cell.is-outside {
   color: rgba(161, 161, 170, 0.45);
+}
+
+.day-cell.is-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.day-cell.is-disabled:hover {
+  background: transparent;
+  color: var(--color-text-normal, #a1a1aa);
 }
 
 .day-cell.is-today {

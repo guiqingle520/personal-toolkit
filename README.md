@@ -87,6 +87,10 @@ $env:APP_AUTH_JWT_EXPIRATION = "PT12H"
 2. `backend/sql/create_todo_item.sql`
 3. `backend/sql/alter_todo_item_add_user_id_phase1.sql`（仅老库升级时需要）
 4. `backend/sql/alter_todo_item_add_user_id_phase2.sql`（仅老库升级时需要）
+5. `backend/sql/alter_todo_item_phase4_reminder.sql`（已存在旧 Todo 表时需要）
+6. `backend/sql/alter_todo_item_phase5_notes_attachments.sql`（已存在旧 Todo 表时需要）
+7. `backend/sql/alter_todo_item_phase6_collaboration_placeholders.sql`（已存在旧 Todo 表时需要）
+8. `backend/sql/alter_todo_item_phase7_reminder_events.sql`（启用站内提醒闭环时需要）
 
 其中：
 
@@ -233,6 +237,8 @@ npm run dev
 - Todo 数据按账号隔离
 - Todo 基础 CRUD
 - Todo 提醒时间
+- Todo 站内提醒列表 / 已读 / 全部已读
+- Todo Saved Views（保存筛选 / 设默认 / 重命名 / 删除）
 - 筛选 / 分页 / 回收站
 - 时间预设筛选（今日到期 / 逾期 / 即将提醒）
 - 重复类型筛选与活动筛选 chips
@@ -253,11 +259,42 @@ npm run dev
 - `backend/sql/alter_todo_item_phase4_reminder.sql`：Todo 提醒时间字段扩展脚本
 - `backend/sql/alter_todo_item_phase5_notes_attachments.sql`：Todo 备注与附件链接字段扩展脚本
 - `backend/sql/alter_todo_item_phase6_collaboration_placeholders.sql`：Todo 协作占位字段扩展脚本
+- `backend/sql/alter_todo_item_phase7_reminder_events.sql`：Todo 站内提醒事件表脚本
 - `docs/phase-3-plan-v1.md`：Phase 3 初始规划
 - `docs/phase-3-plan-v2.md`：Phase 3 中期实施版
 - `docs/phase-3-plan-v3.md`：Phase 3 收尾归档版
 - `docs/phase-4-plan-v1.md`：Phase 4 起始规划版
 - `docs/operation-manual.md`：操作手册
+
+## 站内提醒说明
+
+当前 Phase 5 / Sprint 5.1 已补齐站内提醒闭环，行为如下：
+
+1. Todo 设置 `remindAt` 后，后端会为该任务同步一条待发送提醒事件。
+2. 定时扫描任务默认每 60 秒执行一次，将 `scheduled_at <= 当前时间` 的提醒转为站内未读提醒。
+3. 前端活动任务页会显示提醒面板，支持：
+   - 查看未读提醒
+   - 标记单条已读
+   - 全部已读
+   - 从提醒回到对应任务
+4. 统计面板新增 `未读提醒 / Unread reminders` 指标。
+
+当前提醒闭环仍然是站内能力，尚未接入邮件、短信或 IM 推送。
+
+## Saved Views 说明
+
+当前 Phase 5 / Sprint 5.2 已补齐 Saved Views 的第一版能力，行为如下：
+
+1. 用户可以把当前筛选条件保存成一个命名视图。
+2. 保存视图支持：
+   - 应用
+   - 设为默认
+   - 重命名
+   - 删除
+3. 页面初始化时，如果存在默认视图，会先应用默认视图再请求列表数据。
+4. 当前持久化的字段仅包括白名单筛选项，不包含分页参数 `page/size`。
+
+当前首版前端使用轻量交互，不包含独立弹窗和共享视图能力。
 
 ## 登录验证码联调说明
 

@@ -66,19 +66,22 @@ public class TodoService {
     private final ObjectMapper objectMapper;
     private final CurrentUserProvider currentUserProvider;
     private final AppUserRepository appUserRepository;
+    private final TodoReminderService todoReminderService;
 
     public TodoService(TodoRepository todoRepository,
                        TodoSubItemRepository todoSubItemRepository,
                        RedisTemplate<String, Object> redisTemplate,
                        ObjectMapper objectMapper,
                        CurrentUserProvider currentUserProvider,
-                       AppUserRepository appUserRepository) {
+                       AppUserRepository appUserRepository,
+                       TodoReminderService todoReminderService) {
         this.todoRepository = todoRepository;
         this.todoSubItemRepository = todoSubItemRepository;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.currentUserProvider = currentUserProvider;
         this.appUserRepository = appUserRepository;
+        this.todoReminderService = todoReminderService;
     }
 
     /**
@@ -149,8 +152,9 @@ public class TodoService {
         long overdueCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(userId, "DONE", now);
         long activeCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(userId, "DONE");
         long upcomingReminderCount = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndRemindAtBetween(userId, "DONE", now, reminderWindowEnd);
+        long unreadReminderCount = todoReminderService.countUnreadReminders(userId);
 
-        return new TodoStatsOverviewResponse(todayCompleted, weekCompleted, overdueCount, activeCount, upcomingReminderCount);
+        return new TodoStatsOverviewResponse(todayCompleted, weekCompleted, overdueCount, activeCount, upcomingReminderCount, unreadReminderCount);
     }
 
     /**
@@ -252,6 +256,7 @@ public class TodoService {
         }
 
         TodoItem savedTodoItem = todoRepository.save(todoItem);
+        todoReminderService.syncReminderForTodo(savedTodoItem);
         runAfterCommit(() -> {
             cacheTodoItemWithSummarySafely(savedTodoItem);
         });
@@ -276,6 +281,8 @@ public class TodoService {
 
         TodoItem savedTodoItem = todoRepository.save(todoItem);
         List<TodoItem> generatedRecurringTodos = maybeGenerateRecurringTodos(List.of(savedTodoItem), Map.of(savedTodoItem.getId(), previousStatus));
+        todoReminderService.syncReminderForTodo(savedTodoItem);
+        generatedRecurringTodos.forEach(todoReminderService::syncReminderForTodo);
         runAfterCommit(() -> {
             cacheTodoItemWithSummarySafely(savedTodoItem);
             generatedRecurringTodos.forEach(this::cacheTodoItemWithSummarySafely);
@@ -309,6 +316,8 @@ public class TodoService {
 
         List<TodoItem> savedItems = todoRepository.saveAll(todoItems);
         List<TodoItem> generatedRecurringTodos = maybeGenerateRecurringTodos(savedItems, previousStatuses);
+        savedItems.forEach(todoReminderService::syncReminderForTodo);
+        generatedRecurringTodos.forEach(todoReminderService::syncReminderForTodo);
         runAfterCommit(() -> {
             savedItems.forEach(this::cacheTodoItemWithSummarySafely);
             generatedRecurringTodos.forEach(this::cacheTodoItemWithSummarySafely);
@@ -328,6 +337,7 @@ public class TodoService {
         todoItems.forEach(todoItem -> todoItem.setDeletedAt(deletedAt));
 
         todoRepository.saveAll(todoItems);
+        todoItems.forEach(todoItem -> todoReminderService.cancelPendingRemindersForTodo(todoItem.getId()));
         runAfterCommit(() -> todoItems.forEach(todoItem -> evictTodoItemCacheSafely(todoItem.getId())));
     }
 
@@ -346,6 +356,7 @@ public class TodoService {
 
         todoItem.setDeletedAt(null);
         TodoItem savedTodoItem = todoRepository.save(todoItem);
+        todoReminderService.syncReminderForTodo(savedTodoItem);
         runAfterCommit(() -> cacheTodoItemWithSummarySafely(savedTodoItem));
         return savedTodoItem;
     }
@@ -368,6 +379,7 @@ public class TodoService {
 
         todoItems.forEach(todoItem -> todoItem.setDeletedAt(null));
         List<TodoItem> savedItems = todoRepository.saveAll(todoItems);
+        savedItems.forEach(todoReminderService::syncReminderForTodo);
         runAfterCommit(() -> savedItems.forEach(this::cacheTodoItemWithSummarySafely));
         return savedItems;
     }
@@ -382,6 +394,7 @@ public class TodoService {
         TodoItem todoItem = getExistingTodoItem(id);
         todoItem.setDeletedAt(LocalDateTime.now());
         todoRepository.save(todoItem);
+        todoReminderService.cancelPendingRemindersForTodo(id);
         runAfterCommit(() -> evictTodoItemCacheSafely(id));
     }
 

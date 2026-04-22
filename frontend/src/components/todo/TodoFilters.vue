@@ -12,6 +12,7 @@ defineEmits<{
   (e: 'update:filters', value: TodoFiltersModel): void
   (e: 'loadTodos'): void
   (e: 'resetFilters'): void
+  (e: 'saveCurrentView'): void
 }>()
 
 const presets = [
@@ -86,6 +87,7 @@ function activeFilterChips(filters: TodoFiltersModel) {
       <LocalizedDateInput :modelValue="props.filters.dueDateTo" class="cyber-input form-sm" @update:modelValue="$emit('update:filters', { ...props.filters, dueDateTo: $event })" @change="$emit('loadTodos')" />
       <LocalizedDateInput :modelValue="props.filters.remindDateFrom" :placeholder="$t('reminder.remindFrom')" class="cyber-input form-sm" @update:modelValue="$emit('update:filters', { ...props.filters, remindDateFrom: $event })" @change="$emit('loadTodos')" />
       <LocalizedDateInput :modelValue="props.filters.remindDateTo" :placeholder="$t('reminder.remindTo')" class="cyber-input form-sm" @update:modelValue="$emit('update:filters', { ...props.filters, remindDateTo: $event })" @change="$emit('loadTodos')" />
+      <button class="btn btn-outline btn-sm" @click="$emit('saveCurrentView')">{{ $t('savedViews.saveCurrent') }}</button>
       <button class="btn btn-ghost btn-sm" @click="$emit('resetFilters')">{{ $t('filter.reset') }}</button>
     </div>
 

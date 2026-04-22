@@ -2,11 +2,13 @@ package com.personal.toolkit;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * personal-toolkit 后端应用的 Spring Boot 启动入口。
  */
 @SpringBootApplication
+@EnableScheduling
 public class PersonalToolkitApplication {
 
     /**

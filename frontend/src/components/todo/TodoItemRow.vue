@@ -81,7 +81,7 @@ function formatTimestamp(value: string, loc: string): string {
           </select>
           <input :value="editForm.category" type="text" :placeholder="$t('filter.category')" class="cyber-input form-sm" :list="categoryListId" @input="$emit('update:editForm', { ...editForm, category: ($event.target as HTMLInputElement).value })" />
           <LocalizedDateInput :modelValue="editForm.dueDate" class="cyber-input form-sm" @update:modelValue="$emit('update:editForm', { ...editForm, dueDate: $event })" />
-          <LocalizedDateInput :modelValue="editForm.remindAt" :placeholder="$t('reminder.remindAt')" class="cyber-input form-sm" @update:modelValue="$emit('update:editForm', { ...editForm, remindAt: $event })" />
+          <LocalizedDateInput :modelValue="editForm.remindAt" :max="editForm.dueDate || undefined" :placeholder="$t('reminder.remindAt')" class="cyber-input form-sm" @update:modelValue="$emit('update:editForm', { ...editForm, remindAt: $event })" />
           <input :value="editForm.tags" type="text" :placeholder="$t('form.tagsCsvEdit')" class="cyber-input form-sm" :list="tagListId" @input="$emit('update:editForm', { ...editForm, tags: ($event.target as HTMLInputElement).value })" />
           </div>
           <div class="edit-row">

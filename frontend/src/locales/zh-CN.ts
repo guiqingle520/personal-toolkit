@@ -23,6 +23,17 @@ const zhCN = {
     knownTags: '已知标签',
     noTags: '未找到标签。',
   },
+  savedViews: {
+    title: '保存视图',
+    saveCurrent: '保存当前视图',
+    defaultBadge: '默认',
+    setDefault: '设为默认',
+    rename: '重命名',
+    delete: '删除',
+    promptName: '请输入视图名称',
+    promptRename: '请输入新的视图名称',
+    confirmDelete: '确定删除这个保存视图吗？'
+  },
   filter: {
     search: '搜索关键字...',
     allStatus: '所有状态',
@@ -92,6 +103,7 @@ const zhCN = {
     edit: '编辑',
     delete: '删除',
     restore: '恢复',
+    closeInfo: '关闭提示',
     showChecklist: '显示清单',
     hideChecklist: '隐藏清单',
     confirmDeleteSingle: '您确定要删除此任务吗？',
@@ -106,7 +118,12 @@ const zhCN = {
   feedback: {
     genericError: '发生错误',
     unexpectedError: '发生了未预期的错误',
-    httpError: 'HTTP 错误 {status}'
+    httpError: 'HTTP 错误 {status}',
+    reminderAfterDueDate: '提醒日期不能晚于截止日期',
+    reminderAlignedToDueDate: '提醒日期已同步调整为截止日期',
+    createReminderAlignedToDueDate: '新任务的提醒日期已同步调整为截止日期',
+    editReminderAlignedToDueDate: '编辑中的提醒日期已同步调整为截止日期',
+    createdTodoHiddenByFilters: '任务已创建，但被当前筛选条件隐藏。你可以重置筛选来查看它。'
   },
   pagination: {
     prev: '← 上一页',
@@ -124,10 +141,16 @@ const zhCN = {
     completedAt: '完成于：{time}'
   },
   reminder: {
+    panelTitle: '站内提醒',
     remindAt: '提醒日期',
     remindFrom: '提醒开始',
     remindTo: '提醒结束',
-    scheduledAt: '提醒：{time}'
+    scheduledAt: '提醒：{time}',
+    scheduledAtLabel: '提醒时间：{time}',
+    empty: '当前没有未读提醒',
+    markRead: '标记已读',
+    markAllRead: '全部已读',
+    openTodo: '查看任务'
   },
   collaboration: {
     ownerLabel: '负责人：{value}',
@@ -141,6 +164,7 @@ const zhCN = {
     overdueCount: '逾期任务',
     activeCount: '活动任务',
     upcomingReminderCount: '即将提醒',
+    unreadReminderCount: '未读提醒',
     categoryStats: '分类统计',
     trend7d: '7日趋势',
     uncategorized: '未分类',

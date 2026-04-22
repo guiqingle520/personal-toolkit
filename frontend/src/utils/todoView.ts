@@ -1,3 +1,127 @@
+import type { TodoFiltersModel } from '../components/todo/types'
+
+export type TodoViewMode = 'ACTIVE' | 'RECYCLE_BIN'
+export type TodoDisplayMode = 'LIST' | 'KANBAN'
+
+type TodoUrlState = {
+  filters: TodoFiltersModel
+  viewMode: TodoViewMode
+  displayMode: TodoDisplayMode
+}
+
+const SYNCED_FILTER_KEYS: Array<keyof TodoFiltersModel> = [
+  'page',
+  'status',
+  'priority',
+  'category',
+  'keyword',
+  'tag',
+  'recurrenceType',
+  'timePreset',
+  'dueDateFrom',
+  'dueDateTo',
+  'remindDateFrom',
+  'remindDateTo',
+  'sortBy',
+  'sortDir',
+]
+
+/**
+ * 返回 Todo 列表的默认筛选值。
+ */
+export function createDefaultTodoFilters(): TodoFiltersModel {
+  return {
+    page: 0,
+    size: 10,
+    status: '',
+    priority: '',
+    category: '',
+    keyword: '',
+    tag: '',
+    recurrenceType: '',
+    timePreset: '',
+    dueDateFrom: '',
+    dueDateTo: '',
+    remindDateFrom: '',
+    remindDateTo: '',
+    sortBy: 'createTime',
+    sortDir: 'DESC',
+  }
+}
+
+/**
+ * 将 Todo 页面状态序列化为 URL 查询字符串。
+ */
+export function serializeTodoUrlState(state: TodoUrlState): string {
+  const params = new URLSearchParams()
+  const defaultFilters = createDefaultTodoFilters()
+
+  SYNCED_FILTER_KEYS.forEach((key) => {
+    const value = String(state.filters[key] ?? '')
+    const defaultValue = String(defaultFilters[key] ?? '')
+    if (value && value !== defaultValue) {
+      params.set(key, value)
+    }
+  })
+
+  if (state.viewMode !== 'ACTIVE') {
+    params.set('viewMode', state.viewMode)
+  }
+
+  if (state.displayMode !== 'LIST' && state.viewMode === 'ACTIVE') {
+    params.set('displayMode', state.displayMode)
+  }
+
+  return params.toString()
+}
+
+/**
+ * 将 URL 查询字符串反序列化为 Todo 页面状态。
+ */
+export function parseTodoUrlState(search: string): TodoUrlState {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  const filters = createDefaultTodoFilters()
+
+  SYNCED_FILTER_KEYS.forEach((key) => {
+    const value = params.get(key)
+    if (!value) {
+      return
+    }
+
+    if (key === 'page') {
+      const parsedPage = Number.parseInt(value, 10)
+      filters.page = Number.isFinite(parsedPage) && parsedPage >= 0 ? parsedPage : 0
+      return
+    }
+
+    filters[key] = value as never
+  })
+
+  const viewMode = params.get('viewMode') === 'RECYCLE_BIN' ? 'RECYCLE_BIN' : 'ACTIVE'
+  const displayMode = params.get('displayMode') === 'KANBAN' && viewMode === 'ACTIVE' ? 'KANBAN' : 'LIST'
+
+  return { filters, viewMode, displayMode }
+}
+
+/**
+ * 判断当前 URL 是否包含可恢复的 Todo 状态查询参数。
+ */
+export function hasMeaningfulTodoQuery(search: string): boolean {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  return SYNCED_FILTER_KEYS.some((key) => params.has(key)) || params.has('viewMode') || params.has('displayMode')
+}
+
+/**
+ * 校验提醒日期不能晚于截止日期。
+ */
+export function isReminderAfterDueDate(remindAt?: string | null, dueDate?: string | null): boolean {
+  if (!remindAt || !dueDate) {
+    return false
+  }
+
+  return remindAt > dueDate
+}
+
 /**
  * 将日期输入框值转换为后端可接受的日期时间字符串。
  */

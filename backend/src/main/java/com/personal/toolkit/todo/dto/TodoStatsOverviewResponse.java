@@ -10,17 +10,20 @@ public class TodoStatsOverviewResponse {
     private final long overdueCount;
     private final long activeCount;
     private final long upcomingReminderCount;
+    private final long unreadReminderCount;
 
     public TodoStatsOverviewResponse(long todayCompleted,
                                      long weekCompleted,
                                      long overdueCount,
                                      long activeCount,
-                                     long upcomingReminderCount) {
+                                     long upcomingReminderCount,
+                                     long unreadReminderCount) {
         this.todayCompleted = todayCompleted;
         this.weekCompleted = weekCompleted;
         this.overdueCount = overdueCount;
         this.activeCount = activeCount;
         this.upcomingReminderCount = upcomingReminderCount;
+        this.unreadReminderCount = unreadReminderCount;
     }
 
     /**
@@ -66,5 +69,14 @@ public class TodoStatsOverviewResponse {
      */
     public long getUpcomingReminderCount() {
         return upcomingReminderCount;
+    }
+
+    /**
+     * 返回当前未读的站内提醒数量。
+     *
+     * @return 未读提醒数量
+     */
+    public long getUnreadReminderCount() {
+        return unreadReminderCount;
     }
 }

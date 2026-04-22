@@ -83,5 +83,10 @@ describe('TodoFilters', () => {
     const resetButton = wrapper.find('button.btn-ghost')
     await resetButton.trigger('click')
     expect(wrapper.emitted('resetFilters')).toHaveLength(1)
+
+    const saveViewButton = wrapper.findAll('button').find(button => button.text().includes('Save current view'))
+    expect(saveViewButton).toBeTruthy()
+    await saveViewButton.trigger('click')
+    expect(wrapper.emitted('saveCurrentView')).toHaveLength(1)
   })
 })
