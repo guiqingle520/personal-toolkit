@@ -91,8 +91,8 @@ const maxTrendValue = computed(() => {
 
 <style scoped>
 .todo-stats-panel {
-  margin-bottom: var(--spacing-4, 1rem);
-  padding: var(--spacing-4, 1rem);
+  margin-bottom: 0;
+  padding: 18px;
   background: var(--bg-surface, rgba(255, 255, 255, 0.05));
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-md, 8px);
@@ -106,29 +106,28 @@ const maxTrendValue = computed(() => {
 }
 
 .stats-overview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-4, 1rem);
-  margin-bottom: var(--spacing-4, 1rem);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .stat-box {
-  flex: 1;
-  min-width: 100px;
-  padding: 1rem;
+  min-width: 0;
+  padding: 12px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-sm, 4px);
-  text-align: center;
+  text-align: left;
 }
 
 .stat-label {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--text-muted, #aaa);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .stat-value {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: bold;
 }
 
@@ -140,19 +139,19 @@ const maxTrendValue = computed(() => {
 .stats-row {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4, 1rem);
+  gap: 12px;
 }
 
 .stats-card {
   flex: 1;
   background: rgba(0, 0, 0, 0.2);
-  padding: 1rem;
+  padding: 14px;
   border-radius: var(--radius-sm, 4px);
 }
 
 .stats-card h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1rem;
+  margin: 0 0 0.9rem 0;
+  font-size: 0.95rem;
   color: var(--text-muted, #aaa);
 }
 
