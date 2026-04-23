@@ -441,8 +441,8 @@ describe('TodoList reset behavior', () => {
   it('switches active tasks to kanban view and hides list-only controls', async () => {
     const wrapper = await mountTodoList()
 
-    const toolbarButtons = wrapper.findAll('.view-toggle-bar button')
-    const kanbanButton = toolbarButtons.find((button) => button.text().includes('Kanban View'))
+    const menuButtons = wrapper.findAll('.workbench-menu-button')
+    const kanbanButton = menuButtons.find((button) => button.text().includes('Kanban View'))
     expect(kanbanButton).toBeTruthy()
 
     await kanbanButton!.trigger('click')
@@ -459,8 +459,8 @@ describe('TodoList reset behavior', () => {
   it('resets kanban display mode back to list when switching to recycle bin', async () => {
     const wrapper = await mountTodoList()
 
-    const toolbarButtons = wrapper.findAll('.view-toggle-bar button')
-    const kanbanButton = toolbarButtons.find((button) => button.text().includes('Kanban View'))
+    const menuButtons = wrapper.findAll('.workbench-menu-button')
+    const kanbanButton = menuButtons.find((button) => button.text().includes('Kanban View'))
     await kanbanButton!.trigger('click')
     await flushPromises()
 
@@ -469,14 +469,15 @@ describe('TodoList reset behavior', () => {
 
     expect(wrapper.find('.kanban-board').exists()).toBe(false)
     expect(wrapper.find('.todo-list').exists()).toBe(true)
-    expect(wrapper.text()).not.toContain('Kanban View')
+    expect(kanbanButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.vm.displayMode).toBe('LIST')
   })
 
   it('updates todo status when kanban moves a task to another column', async () => {
     const wrapper = await mountTodoList()
 
-    const toolbarButtons = wrapper.findAll('.view-toggle-bar button')
-    const kanbanButton = toolbarButtons.find((button) => button.text().includes('Kanban View'))
+    const menuButtons = wrapper.findAll('.workbench-menu-button')
+    const kanbanButton = menuButtons.find((button) => button.text().includes('Kanban View'))
     await kanbanButton!.trigger('click')
     await flushPromises()
 

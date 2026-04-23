@@ -2,18 +2,152 @@
 .workbench-layout {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
 }
 
 .workbench-top {
   width: 100%;
 }
 
+.workbench-menu {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  padding-right: 6px;
+}
+
 .workbench-body {
+  position: relative;
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
   gap: 32px;
   align-items: start;
+}
+
+.workbench-body::before {
+  content: '';
+  position: absolute;
+  left: 256px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0), rgba(56, 189, 248, 0.18), rgba(255,255,255,0.06), rgba(56, 189, 248, 0));
+  pointer-events: none;
+}
+
+.workbench-menu-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
+  position: relative;
+}
+
+.workbench-menu-panel::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  right: -12px;
+  width: 24px;
+  bottom: 18px;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0));
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.workbench-menu-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+  border: 1px solid rgba(255,255,255,0.04);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.workbench-menu-section + .workbench-menu-section {
+  padding-top: 14px;
+}
+
+.workbench-menu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.workbench-menu-label::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+}
+
+.workbench-menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workbench-menu-button {
+  position: relative;
+  width: 100%;
+  justify-content: flex-start;
+  padding-inline: 14px;
+  border-color: rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.025);
+  color: var(--color-text-bright);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
+}
+
+.workbench-menu-button:not(:disabled):hover {
+  border-color: rgba(56, 189, 248, 0.26);
+  background: rgba(255,255,255,0.055);
+  transform: translateY(-1px);
+}
+
+.workbench-menu-button:not(:disabled):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.workbench-menu-button.is-active {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(59, 130, 246, 0.14));
+  color: var(--color-text-white);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 10px 20px rgba(2, 132, 199, 0.18);
+}
+
+.workbench-menu-button.is-active::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 4px;
+  height: calc(100% - 16px);
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #67e8f9, #38bdf8);
+}
+
+.workbench-menu-button:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .workbench-sidebar {
@@ -37,10 +171,39 @@
 }
 
 .workbench-main {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   gap: 18px;
+  padding-left: 2px;
+}
+
+.workbench-main > .options-panel,
+.workbench-main > .create-form,
+.workbench-main > .error-banner,
+.workbench-main > .info-banner,
+.workbench-main > .state-message,
+.workbench-main > .batch-actions-bar,
+.workbench-main > .todo-list,
+.workbench-main > .kanban-board,
+.workbench-main > .pagination {
+  position: relative;
+}
+
+.workbench-main > .options-panel::before,
+.workbench-main > .create-form::before,
+.workbench-main > .batch-actions-bar::before,
+.workbench-main > .kanban-board::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 18px;
+  width: 6px;
+  height: calc(100% - 36px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0));
+  pointer-events: none;
 }
 
 /* --- Base & Header --- */
@@ -889,9 +1052,34 @@
 
 /* --- Responsive --- */
 @media (max-width: 1024px) {
+  .workbench-menu {
+    position: static;
+    padding-right: 0;
+  }
+
   .workbench-body {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .workbench-body::before,
+  .workbench-menu-panel::after,
+  .workbench-main > .options-panel::before,
+  .workbench-main > .create-form::before,
+  .workbench-main > .batch-actions-bar::before,
+  .workbench-main > .kanban-board::before {
+    display: none;
+  }
+
+  .workbench-menu-panel {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .workbench-menu-section + .workbench-menu-section {
+    padding-top: 14px;
   }
 
   .workbench-sidebar {
@@ -921,6 +1109,37 @@
 
   .workbench-sidebar {
     grid-template-columns: 1fr;
+  }
+
+  .workbench-menu-panel {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .workbench-menu-section {
+    flex: 0 0 min(240px, 78vw);
+    min-height: 100%;
+    scroll-snap-align: start;
+    padding: 12px;
+  }
+
+  .workbench-menu-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+  }
+
+  .workbench-menu-button {
+    min-height: 40px;
+    padding-inline: 12px;
+  }
+
+  .workbench-main {
+    padding-left: 0;
   }
 
   .todo-header {

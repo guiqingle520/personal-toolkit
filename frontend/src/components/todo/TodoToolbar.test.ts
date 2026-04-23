@@ -16,7 +16,7 @@ function createPageData(): PageData<TodoItem> {
 }
 
 describe('TodoToolbar', () => {
-  it('emits refresh, locale change, view mode toggles, and options toggle', async () => {
+  it('emits refresh and locale change from the top header controls', async () => {
     const wrapper = mountWithI18n(TodoToolbar, {
       props: {
         displayMode: 'LIST',
@@ -33,19 +33,13 @@ describe('TodoToolbar', () => {
     await select.setValue('zh-CN')
     expect(wrapper.emitted('update:locale')?.[0]).toEqual(['zh-CN'])
 
-    const refreshButton = wrapper.find('header button')
-    const toggleButtons = wrapper.findAll('.view-toggle-bar button')
+    const refreshButton = wrapper.find('.header-actions .btn-outline')
     await refreshButton.trigger('click')
-    await toggleButtons[0].trigger('click')
-    await toggleButtons[1].trigger('click')
-    await toggleButtons[2].trigger('click')
-    await toggleButtons[3].trigger('click')
-    await toggleButtons[4].trigger('click')
 
     expect(wrapper.emitted('refresh')).toHaveLength(1)
-    expect(wrapper.emitted('update:viewMode')).toEqual([['ACTIVE'], ['RECYCLE_BIN']])
-    expect(wrapper.emitted('update:displayMode')).toEqual([['LIST'], ['KANBAN']])
-    expect(wrapper.emitted('update:showOptionsPanel')).toEqual([[true]])
+    expect(wrapper.emitted('update:viewMode')).toBeUndefined()
+    expect(wrapper.emitted('update:displayMode')).toBeUndefined()
+    expect(wrapper.emitted('update:showOptionsPanel')).toBeUndefined()
   })
 
   it('stabilizes the refresh button width to prevent jitter', async () => {
@@ -61,8 +55,26 @@ describe('TodoToolbar', () => {
       },
     })
     
-    const refreshButton = wrapper.find('header button')
+    const refreshButton = wrapper.find('.header-actions .btn-outline')
     expect(refreshButton.attributes('style')).toContain('min-width: 100px')
     expect(refreshButton.attributes('style')).toContain('text-align: center')
+  })
+
+  it('renders the header summary with total and pending counts', () => {
+    const wrapper = mountWithI18n(TodoToolbar, {
+      props: {
+        displayMode: 'LIST',
+        pageData: createPageData(),
+        pendingCount: 3,
+        loading: false,
+        viewMode: 'ACTIVE',
+        showOptionsPanel: false,
+        locale: 'en',
+      },
+    })
+
+    expect(wrapper.find('.title-group h1').text()).toBe('Tasks')
+    expect(wrapper.find('.subtitle').text()).toContain('12 total')
+    expect(wrapper.find('.subtitle').text()).toContain('3 pending')
   })
 })

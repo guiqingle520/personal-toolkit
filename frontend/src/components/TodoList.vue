@@ -1019,52 +1019,82 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
           @update:viewMode="handleViewModeUpdate"
           @update:showOptionsPanel="showOptionsPanel = $event"
         />
-
-        <datalist id="category-options">
-          <option v-for="c in options.categories" :key="c" :value="c"></option>
-        </datalist>
-        <datalist id="tag-options">
-          <option v-for="t in options.tags" :key="t" :value="t"></option>
-        </datalist>
       </div>
 
+      <datalist id="category-options">
+        <option v-for="c in options.categories" :key="c" :value="c"></option>
+      </datalist>
+      <datalist id="tag-options">
+        <option v-for="t in options.tags" :key="t" :value="t"></option>
+      </datalist>
+
       <div class="workbench-body">
-        <aside class="workbench-sidebar">
-          <TodoStatsPanel 
-            v-if="viewMode === 'ACTIVE'"
-            :overview="statsOverview"
-            :categories="statsCategories"
-            :trend="statsTrend"
-          />
+        <aside class="workbench-menu">
+          <div class="workbench-menu-panel">
+            <div class="workbench-menu-section">
+              <span class="workbench-menu-label">{{ $t('app.title') }}</span>
+              <div class="workbench-menu-group">
+                <button
+                  type="button"
+                  class="btn btn-outline workbench-menu-button"
+                  :class="{ 'is-active': viewMode === 'ACTIVE' }"
+                  :aria-pressed="viewMode === 'ACTIVE'"
+                  @click="handleViewModeUpdate('ACTIVE')"
+                >
+                  {{ $t('app.activeTasks') }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline workbench-menu-button"
+                  :class="{ 'is-active': viewMode === 'RECYCLE_BIN' }"
+                  :aria-pressed="viewMode === 'RECYCLE_BIN'"
+                  @click="handleViewModeUpdate('RECYCLE_BIN')"
+                >
+                  {{ $t('app.recycleBin') }}
+                </button>
+              </div>
+            </div>
 
-          <TodoReminderPanel
-            v-if="viewMode === 'ACTIVE'"
-            :reminders="reminders"
-            :loading="reminderLoading"
-            @mark-read="markReminderAsRead"
-            @mark-all-read="markAllRemindersAsRead"
-            @open-todo="openReminderTodo"
-          />
+            <div class="workbench-menu-section">
+              <span class="workbench-menu-label">{{ $t('app.listView') }} / {{ $t('app.kanbanView') }}</span>
+              <div class="workbench-menu-group">
+                <button
+                  type="button"
+                  class="btn btn-outline workbench-menu-button"
+                  :class="{ 'is-active': displayMode === 'LIST' }"
+                  :aria-pressed="displayMode === 'LIST'"
+                  @click="handleDisplayModeUpdate('LIST')"
+                >
+                  {{ $t('app.listView') }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline workbench-menu-button"
+                  :class="{ 'is-active': displayMode === 'KANBAN' }"
+                  :aria-pressed="displayMode === 'KANBAN'"
+                  :disabled="viewMode !== 'ACTIVE'"
+                  @click="handleDisplayModeUpdate('KANBAN')"
+                >
+                  {{ $t('app.kanbanView') }}
+                </button>
+              </div>
+            </div>
 
-          <TodoSavedViewsBar
-            v-if="viewMode === 'ACTIVE'"
-            :savedViews="savedViews"
-            @apply="applySavedView"
-            @set-default="setDefaultSavedView"
-            @rename="renameSavedView"
-            @delete="deleteSavedView"
-          />
-
-          <TodoFilters 
-            v-if="displayMode === 'LIST'"
-            :filters="filters"
-            :categoryListId="CATEGORY_LIST_ID"
-            :tagListId="TAG_LIST_ID"
-            @update:filters="handleFiltersUpdate"
-            @loadTodos="loadTodos"
-            @resetFilters="resetFilters"
-            @saveCurrentView="saveCurrentView"
-          />
+            <div class="workbench-menu-section">
+              <span class="workbench-menu-label">{{ $t('options.knownCategories') }}</span>
+              <div class="workbench-menu-group">
+                <button
+                  type="button"
+                  class="btn btn-outline workbench-menu-button"
+                  :class="{ 'is-active': showOptionsPanel }"
+                  :aria-pressed="showOptionsPanel"
+                  @click="showOptionsPanel = !showOptionsPanel"
+                >
+                  {{ $t('app.manageCategories') }}
+                </button>
+              </div>
+            </div>
+          </div>
         </aside>
 
         <main class="workbench-main">
@@ -1195,8 +1225,45 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             @nextPage="nextPage"
           />
         </main>
-      </div>
 
+        <aside class="workbench-sidebar">
+          <TodoStatsPanel 
+            v-if="viewMode === 'ACTIVE'"
+            :overview="statsOverview"
+            :categories="statsCategories"
+            :trend="statsTrend"
+          />
+
+          <TodoReminderPanel
+            v-if="viewMode === 'ACTIVE'"
+            :reminders="reminders"
+            :loading="reminderLoading"
+            @mark-read="markReminderAsRead"
+            @mark-all-read="markAllRemindersAsRead"
+            @open-todo="openReminderTodo"
+          />
+
+          <TodoSavedViewsBar
+            v-if="viewMode === 'ACTIVE'"
+            :savedViews="savedViews"
+            @apply="applySavedView"
+            @set-default="setDefaultSavedView"
+            @rename="renameSavedView"
+            @delete="deleteSavedView"
+          />
+
+          <TodoFilters 
+            v-if="displayMode === 'LIST'"
+            :filters="filters"
+            :categoryListId="CATEGORY_LIST_ID"
+            :tagListId="TAG_LIST_ID"
+            @update:filters="handleFiltersUpdate"
+            @loadTodos="loadTodos"
+            @resetFilters="resetFilters"
+            @saveCurrentView="saveCurrentView"
+          />
+        </aside>
+      </div>
     </div>
   </section>
 </template>

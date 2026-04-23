@@ -45,14 +45,15 @@ async function handleLogout() {
   <div>
     <header class="todo-header">
       <div class="title-group">
-        <h1>{{ $t('app.title') }}</h1>
-        <p class="subtitle" v-if="pageData">
-          {{ $t('app.total', { total: pageData.totalElements }) }} 
-          <span class="divider">&bull;</span> 
-          <span class="highlight">{{ $t('app.pending', { pending: pendingCount }) }}</span> 
-          {{ $t('app.onThisPage') }}
-        </p>
+          <h1>{{ $t('app.title') }}</h1>
+          <p class="subtitle" v-if="pageData">
+            {{ $t('app.total', { total: pageData.totalElements }) }} 
+            <span class="divider">&bull;</span> 
+            <span class="highlight">{{ $t('app.pending', { pending: pendingCount }) }}</span> 
+            {{ $t('app.onThisPage') }}
+          </p>
       </div>
+
       <div class="header-actions">
         <label class="sr-only" for="locale-switcher">{{ $t('app.localeLabel') }}</label>
         <select id="locale-switcher" :value="locale" class="cyber-input form-sm" :title="$t('app.localeLabel')" :aria-label="$t('app.localeLabel')" @change="$emit('update:locale', ($event.target as HTMLSelectElement).value as AppLocale)">
@@ -66,16 +67,5 @@ async function handleLogout() {
         </button>
       </div>
     </header>
-
-    <!-- VIEW TOGGLE -->
-    <div class="view-toggle-bar">
-      <button :class="['btn btn-sm', viewMode === 'ACTIVE' ? 'btn-primary' : 'btn-outline']" @click="$emit('update:viewMode', 'ACTIVE')">{{ $t('app.activeTasks') }}</button>
-      <button :class="['btn btn-sm', viewMode === 'RECYCLE_BIN' ? 'btn-primary' : 'btn-outline']" @click="$emit('update:viewMode', 'RECYCLE_BIN')">{{ $t('app.recycleBin') }}</button>
-      <template v-if="viewMode === 'ACTIVE'">
-        <button :class="['btn btn-sm', displayMode === 'LIST' ? 'btn-primary' : 'btn-outline']" @click="$emit('update:displayMode', 'LIST')">{{ $t('app.listView') }}</button>
-        <button :class="['btn btn-sm', displayMode === 'KANBAN' ? 'btn-primary' : 'btn-outline']" @click="$emit('update:displayMode', 'KANBAN')">{{ $t('app.kanbanView') }}</button>
-      </template>
-      <button class="btn btn-sm btn-outline" @click="$emit('update:showOptionsPanel', !showOptionsPanel)">{{ $t('app.manageCategories') }}</button>
-    </div>
   </div>
 </template>
