@@ -755,7 +755,7 @@ onUnmounted(() => {
 
 .day-cell.is-selected {
   background: var(--color-primary-gradient, linear-gradient(135deg, #3b82f6 0%, #2563eb 100%));
-  color: var(--color-text-white, #fff);
+  color: var(--color-text-inverse, #fff);
   border-color: transparent;
   font-weight: 600;
   box-shadow: var(--shadow-primary, 0 4px 12px rgba(37, 99, 235, 0.2));

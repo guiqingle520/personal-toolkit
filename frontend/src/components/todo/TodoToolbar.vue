@@ -24,21 +24,6 @@ const localeOptions: Array<{ value: AppLocale; labelKey: 'locale.en' | 'locale.z
   { value: 'en', labelKey: 'locale.en' },
   { value: 'zh-CN', labelKey: 'locale.zhCN' }
 ]
-
-import { useAuth } from '../../composables/useAuth'
-import { fetchApi } from '../../api'
-
-const { clearToken } = useAuth()
-
-async function handleLogout() {
-  try {
-    await fetchApi('/api/auth/logout', { method: 'POST' })
-  } catch (error) {
-    console.warn('Failed to notify logout endpoint before clearing local session.', error)
-  } finally {
-    clearToken()
-  }
-}
 </script>
 
 <template>
@@ -61,9 +46,6 @@ async function handleLogout() {
         </select>
         <button type="button" class="btn btn-outline" style="min-width: 100px; text-align: center;" :disabled="loading" @click="$emit('refresh')">
           {{ loading ? $t('app.syncing') : $t('app.refresh') }}
-        </button>
-        <button type="button" class="btn btn-danger-outline" @click="handleLogout">
-          {{ $t('auth.logout') }}
         </button>
       </div>
     </header>

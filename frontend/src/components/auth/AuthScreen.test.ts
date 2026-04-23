@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AuthScreen from './AuthScreen.vue'
 import { mountWithI18n } from '../../test/test-utils'
+import { setTheme } from '../../theme'
 
 async function flushUi() {
   await Promise.resolve()
@@ -40,6 +41,7 @@ describe('AuthScreen', () => {
       })
     }))
     localStorage.clear()
+    document.documentElement.removeAttribute('data-theme')
   })
 
   it('shows username-or-email label in login mode', async () => {
@@ -118,5 +120,15 @@ describe('AuthScreen', () => {
     const labels = wrapper.findAll('label').map((label) => label.text())
     expect(labels).toContain('Username')
     expect(labels).toContain('Email')
+  })
+
+  it('keeps the auth screen mounted under a light theme', async () => {
+    setTheme('light')
+
+    const wrapper = mountWithI18n(AuthScreen)
+    await flushUi()
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    expect(wrapper.find('.auth-card').exists()).toBe(true)
   })
 })

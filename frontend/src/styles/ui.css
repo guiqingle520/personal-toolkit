@@ -24,7 +24,7 @@
 
 .btn-primary {
   background: var(--color-primary-gradient);
-  color: var(--color-text-white);
+  color: var(--color-text-inverse);
   box-shadow: var(--shadow-primary);
 }
 
@@ -41,7 +41,7 @@
 
 .btn-outline:not(:disabled):hover {
   background: var(--color-surface-hover);
-  color: var(--color-text-white);
+  color: var(--color-text-strong);
 }
 
 .btn-danger-outline {
@@ -82,13 +82,13 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 10px 14px;
-  color: #fff;
+  color: var(--color-text-bright);
   font-size: 0.95rem;
   transition: all var(--transition-fast);
   outline: none;
   box-sizing: border-box;
   font-family: inherit;
-  color-scheme: dark;
+  color-scheme: inherit;
   line-height: 1.5;
   height: 44px;
 }

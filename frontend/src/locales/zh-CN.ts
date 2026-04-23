@@ -17,6 +17,20 @@ const zhCN = {
     en: '英文',
     zhCN: '中文'
   },
+  theme: {
+    label: '主题',
+    current: '当前：{theme}',
+    system: '跟随系统',
+    light: '浅色',
+    dark: '深色'
+  },
+  account: {
+    buttonLabel: '账号',
+    menuLabel: '打开账号菜单',
+    management: '账号管理',
+    themeSettings: '主题设置',
+    signedInAs: '当前账号：{value}'
+  },
   options: {
     knownCategories: '已知分类',
     noCategories: '未找到分类。',

@@ -17,6 +17,20 @@ const en = {
     en: 'English',
     zhCN: 'Chinese'
   },
+  theme: {
+    label: 'Theme',
+    current: 'Current: {theme}',
+    system: 'Follow System',
+    light: 'Light',
+    dark: 'Dark'
+  },
+  account: {
+    buttonLabel: 'Account',
+    menuLabel: 'Open account menu',
+    management: 'Account Management',
+    themeSettings: 'Theme Settings',
+    signedInAs: 'Signed in as {value}'
+  },
   options: {
     knownCategories: 'Known Categories',
     noCategories: 'No categories found.',

@@ -37,6 +37,7 @@ describe('TodoToolbar', () => {
     await refreshButton.trigger('click')
 
     expect(wrapper.emitted('refresh')).toHaveLength(1)
+    expect(wrapper.findAll('.header-actions button')).toHaveLength(1)
     expect(wrapper.emitted('update:viewMode')).toBeUndefined()
     expect(wrapper.emitted('update:displayMode')).toBeUndefined()
     expect(wrapper.emitted('update:showOptionsPanel')).toBeUndefined()
