@@ -173,6 +173,7 @@ async function mountTodoList() {
   const wrapper = mount(TodoList, {
     global: {
       plugins: [i18n],
+      stubs: { Teleport: true }
     },
   })
 
@@ -244,6 +245,59 @@ describe('TodoList reset behavior', () => {
       if (url.includes('/api/todos/batch/')) return { ok: true, json: async () => createSuccessResponse(null) }
       return { ok: true, json: async () => createPageResponse() }
     })
+  })
+
+  it('renders header, menu, main, and sidebar regions through TodoWorkbenchLayout', async () => {
+    const wrapper = await mountTodoList()
+
+    expect(wrapper.find('.workbench-layout').exists()).toBe(true)
+    expect(wrapper.find('.workbench-top').exists()).toBe(true)
+    expect(wrapper.find('.workbench-menu').exists()).toBe(true)
+    expect(wrapper.find('.workbench-main').exists()).toBe(true)
+    expect(wrapper.find('.workbench-sidebar').exists()).toBe(true)
+
+    expect(wrapper.findComponent({ name: 'TodoToolbar' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'TodoStatsPanel' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'TodoReminderPanel' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'TodoSavedViewsBar' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'TodoFilters' }).exists()).toBe(true)
+  })
+
+  it('keeps the left menu actions wired to the same state transitions', async () => {
+    const wrapper = await mountTodoList()
+
+    const menuButtons = wrapper.findAll('.workbench-menu-button')
+    const recycleButton = menuButtons.find((button) => button.text().includes('Recycle Bin'))
+    const activeButton = menuButtons.find((button) => button.text().includes('Active Tasks'))
+
+    expect(activeButton).toBeTruthy()
+    expect(recycleButton).toBeTruthy()
+
+    await recycleButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.viewMode).toBe('RECYCLE_BIN')
+
+    await activeButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.viewMode).toBe('ACTIVE')
+  })
+
+  it('still toggles the options panel from the left menu', async () => {
+    const wrapper = await mountTodoList()
+
+    expect(wrapper.findComponent({ name: 'TodoOptionsPanel' }).props('show')).toBe(false)
+
+    const menuButtons = wrapper.findAll('.workbench-menu-button')
+    const manageCategoriesButton = menuButtons.find((button) => button.text().includes('Manage Categories'))
+
+    expect(manageCategoriesButton).toBeTruthy()
+
+    await manageCategoriesButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'TodoOptionsPanel' }).props('show')).toBe(true)
   })
 
   it('resets filters back to defaults and clears current selection', async () => {
@@ -436,6 +490,40 @@ describe('TodoList reset behavior', () => {
     await flushPromises()
 
     expect(wrapper.find('.todo-stats-panel').exists()).toBe(false)
+  })
+
+  it('switches active tasks to calendar view and hides list-only controls', async () => {
+    const wrapper = await mountTodoList()
+
+    const menuButtons = wrapper.findAll('.workbench-menu-button')
+    const calendarButton = menuButtons.find((button) => button.text().includes('Calendar View'))
+    expect(calendarButton).toBeTruthy()
+
+    await calendarButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.calendar-board').exists()).toBe(true)
+    expect(wrapper.find('.filter-section').exists()).toBe(false)
+    expect(wrapper.find('.create-form').exists()).toBe(false)
+    expect(wrapper.find('.pagination').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Mon')
+  })
+
+  it('resets calendar display mode back to list when switching to recycle bin', async () => {
+    const wrapper = await mountTodoList()
+
+    const menuButtons = wrapper.findAll('.workbench-menu-button')
+    const calendarButton = menuButtons.find((button) => button.text().includes('Calendar View'))
+    await calendarButton!.trigger('click')
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'TodoToolbar' }).vm.$emit('update:viewMode', 'RECYCLE_BIN')
+    await flushPromises()
+
+    expect(wrapper.find('.calendar-board').exists()).toBe(false)
+    expect(wrapper.find('.todo-list').exists()).toBe(true)
+    expect(calendarButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.vm.displayMode).toBe('LIST')
   })
 
   it('switches active tasks to kanban view and hides list-only controls', async () => {
@@ -671,14 +759,24 @@ describe('TodoList reset behavior', () => {
     await wrapper.find('.edit-btn').trigger('click')
     await flushPromises()
 
-    const editRows = wrapper.findAll('.edit-row')
-    const dueDateInput = editRows[0].find('.localized-date-input-wrapper input')
-    const remindAtInput = editRows[0].findAll('.localized-date-input-wrapper input')[1]
+    expect(wrapper.find('.todo-edit-drawer').exists()).toBe(true)
+
+    let editRows = wrapper.findAll('.todo-edit-drawer .edit-row')
+    let dueDateInput = editRows[0].find('.localized-date-input-wrapper input')
+    let remindAtInput = editRows[0].findAll('.localized-date-input-wrapper input')[1]
 
     await dueDateInput.setValue('2026-04-12')
     await dueDateInput.trigger('input')
+    await flushPromises()
+
+    editRows = wrapper.findAll('.todo-edit-drawer .edit-row')
+    remindAtInput = editRows[0].findAll('.localized-date-input-wrapper input')[1]
     await remindAtInput.setValue('2026-04-11')
     await remindAtInput.trigger('input')
+    await flushPromises()
+
+    editRows = wrapper.findAll('.todo-edit-drawer .edit-row')
+    dueDateInput = editRows[0].find('.localized-date-input-wrapper input')
     await dueDateInput.setValue('2026-04-10')
     await dueDateInput.trigger('input')
     await flushPromises()

@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import TodoToolbar from './todo/TodoToolbar.vue'
+import TodoWorkbenchLayout from './todo/TodoWorkbenchLayout.vue'
+import TodoEditDrawer from './todo/TodoEditDrawer.vue'
 import TodoOptionsPanel from './todo/TodoOptionsPanel.vue'
 import TodoStatsPanel from './todo/TodoStatsPanel.vue'
 import TodoFilters from './todo/TodoFilters.vue'
@@ -13,6 +15,7 @@ import TodoItemsList from './todo/TodoItemsList.vue'
 import TodoKanbanView from './todo/TodoKanbanView.vue'
 import TodoReminderPanel from './todo/TodoReminderPanel.vue'
 import TodoSavedViewsBar from './todo/TodoSavedViewsBar.vue'
+import TodoCalendarView from './todo/TodoCalendarView.vue'
 import type { PageData, TodoDraft, TodoFiltersModel, TodoItem, TodoOptions, TodoReminderItem, TodoSavedView, TodoSubItem, TodoSubItemSummary, TodoStatsOverview, TodoStatsCategoryItem, TodoStatsTrend, TodoStatsTrendItem } from './todo/types'
 
 function handleSelectedUpdate(id: number, selected: boolean) {
@@ -77,6 +80,7 @@ const newTodo = ref<TodoDraft>({
 })
 
 const editingId = ref<number | null>(null)
+const editingTodo = computed(() => todos.value.find(t => t.id === editingId.value) || null)
 const editTodoForm = ref<TodoDraft>({
   title: '',
   priority: 3,
@@ -99,7 +103,7 @@ const filters = ref<TodoFiltersModel>(createDefaultTodoFilters())
 const pendingCount = computed(() => todos.value.filter(t => t.status !== 'DONE').length)
 
 const viewMode = ref<'ACTIVE' | 'RECYCLE_BIN'>('ACTIVE')
-const displayMode = ref<'LIST' | 'KANBAN'>('LIST')
+const displayMode = ref<'LIST' | 'KANBAN' | 'CALENDAR'>('LIST')
 const selectedIds = ref<number[]>([])
 const options = ref<TodoOptions>({ categories: [], tags: [] })
 const showOptionsPanel = ref(false)
@@ -145,7 +149,7 @@ function handleLocaleUpdate(nextLocale: AppLocale) {
   locale.value = nextLocale
 }
 
-function handleDisplayModeUpdate(nextDisplayMode: 'LIST' | 'KANBAN') {
+function handleDisplayModeUpdate(nextDisplayMode: 'LIST' | 'KANBAN' | 'CALENDAR') {
   displayMode.value = viewMode.value === 'ACTIVE' ? nextDisplayMode : 'LIST'
   syncUrlState(false)
 }
@@ -168,7 +172,12 @@ function handleNewTodoUpdate(nextDraft: TodoDraft) {
 }
 
 function handleEditFormUpdate(nextDraft: TodoDraft) {
-  editTodoForm.value = nextDraft
+  editTodoForm.value = isReminderAfterDueDate(nextDraft.remindAt, nextDraft.dueDate)
+    ? {
+        ...nextDraft,
+        remindAt: nextDraft.dueDate,
+      }
+    : nextDraft
 }
 
 function showInfoMessage(message: string) {
@@ -715,7 +724,10 @@ function cancelEdit() {
   editingId.value = null
 }
 
-async function saveEdit(todo: TodoItem) {
+async function saveEdit() {
+  const todo = editingTodo.value
+  if (!todo) return
+
   if (!editTodoForm.value.title.trim()) {
     cancelEdit()
     return
@@ -1003,8 +1015,9 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
 <template>
   <section class="todo-panel">
     <div class="glass-bg"></div>
-    <div class="content-wrapper workbench-layout">
-      <div class="workbench-top">
+    <div class="content-wrapper">
+      <TodoWorkbenchLayout>
+        <template #header>
         <TodoToolbar
           :displayMode="displayMode"
           @update:displayMode="handleDisplayModeUpdate" 
@@ -1019,7 +1032,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
           @update:viewMode="handleViewModeUpdate"
           @update:showOptionsPanel="showOptionsPanel = $event"
         />
-      </div>
+        </template>
 
       <datalist id="category-options">
         <option v-for="c in options.categories" :key="c" :value="c"></option>
@@ -1028,8 +1041,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
         <option v-for="t in options.tags" :key="t" :value="t"></option>
       </datalist>
 
-      <div class="workbench-body">
-        <aside class="workbench-menu">
+        <template #menu>
           <div class="workbench-menu-panel">
             <div class="workbench-menu-section">
               <span class="workbench-menu-label">{{ $t('app.title') }}</span>
@@ -1056,7 +1068,7 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             </div>
 
             <div class="workbench-menu-section">
-              <span class="workbench-menu-label">{{ $t('app.listView') }} / {{ $t('app.kanbanView') }}</span>
+              <span class="workbench-menu-label">{{ $t('app.listView') }} / {{ $t('app.kanbanView') }} / {{ $t('app.calendarView') }}</span>
               <div class="workbench-menu-group">
                 <button
                   type="button"
@@ -1077,6 +1089,16 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
                 >
                   {{ $t('app.kanbanView') }}
                 </button>
+                <button
+                  type="button"
+                  class="btn btn-outline workbench-menu-button"
+                  :class="{ 'is-active': displayMode === 'CALENDAR' }"
+                  :aria-pressed="displayMode === 'CALENDAR'"
+                  :disabled="viewMode !== 'ACTIVE'"
+                  @click="handleDisplayModeUpdate('CALENDAR')"
+                >
+                  {{ $t('app.calendarView') }}
+                </button>
               </div>
             </div>
 
@@ -1095,9 +1117,8 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
               </div>
             </div>
           </div>
-        </aside>
+        </template>
 
-        <main class="workbench-main">
           <TodoOptionsPanel 
             :options="options" 
             :show="showOptionsPanel"
@@ -1156,8 +1177,6 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             v-if="displayMode === 'LIST'"
             :todos="todos"
             :selectedIds="selectedIds"
-            :editingId="editingId"
-            :editTodoForm="editTodoForm"
             :viewMode="viewMode"
             :submitting="submitting"
             :categoryListId="CATEGORY_LIST_ID"
@@ -1170,12 +1189,9 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             :checklistCreatingTodoIds="checklistCreatingTodoIds"
             :checklistPendingSubItemIdsByTodoId="checklistPendingSubItemIdsByTodoId"
             @update:selected="handleSelectedUpdate"
-            @update:editForm="handleEditFormUpdate"
             @toggleStatus="toggleStatus"
             @moveTodo="moveTodoToStatus"
             @startEdit="startEdit"
-            @cancelEdit="cancelEdit"
-            @saveEdit="saveEdit"
             @deleteTodo="deleteTodo"
             @restoreTodo="restoreTodo"
             @toggleChecklist="toggleChecklist"
@@ -1189,8 +1205,6 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             v-if="displayMode === 'KANBAN' && viewMode === 'ACTIVE'"
             :todos="todos"
             :selectedIds="selectedIds"
-            :editingId="editingId"
-            :editTodoForm="editTodoForm"
             :viewMode="viewMode"
             :submitting="submitting"
             :categoryListId="CATEGORY_LIST_ID"
@@ -1203,11 +1217,8 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             :checklistCreatingTodoIds="checklistCreatingTodoIds"
             :checklistPendingSubItemIdsByTodoId="checklistPendingSubItemIdsByTodoId"
             @update:selected="handleSelectedUpdate"
-            @update:editForm="handleEditFormUpdate"
             @toggleStatus="toggleStatus"
             @startEdit="startEdit"
-            @cancelEdit="cancelEdit"
-            @saveEdit="saveEdit"
             @deleteTodo="deleteTodo"
             @restoreTodo="restoreTodo"
             @toggleChecklist="toggleChecklist"
@@ -1217,6 +1228,13 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             @deleteSubItem="deleteSubItem"
           />
 
+          <TodoCalendarView
+            v-if="displayMode === 'CALENDAR' && viewMode === 'ACTIVE'"
+            :todos="todos"
+            @startEdit="startEdit"
+            @toggleStatus="toggleStatus"
+          />
+
           <TodoPagination 
             v-if="displayMode === 'LIST'" 
             :pageData="pageData"
@@ -1224,9 +1242,19 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             @prevPage="prevPage"
             @nextPage="nextPage"
           />
-        </main>
 
-        <aside class="workbench-sidebar">
+          <TodoEditDrawer
+            :isOpen="editingId !== null"
+            :editForm="editTodoForm"
+            :categoryListId="CATEGORY_LIST_ID"
+            :tagListId="TAG_LIST_ID"
+            :submitting="submitting"
+            @update:editForm="handleEditFormUpdate"
+            @save="saveEdit"
+            @cancel="cancelEdit"
+          />
+
+        <template #sidebar>
           <TodoStatsPanel 
             v-if="viewMode === 'ACTIVE'"
             :overview="statsOverview"
@@ -1262,8 +1290,8 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             @resetFilters="resetFilters"
             @saveCurrentView="saveCurrentView"
           />
-        </aside>
-      </div>
+        </template>
+      </TodoWorkbenchLayout>
     </div>
   </section>
 </template>

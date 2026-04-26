@@ -2,13 +2,11 @@
 import { computed, ref } from 'vue'
 
 import TodoItemRow from './TodoItemRow.vue'
-import type { TodoDraft, TodoItem, TodoSubItem, TodoSubItemSummary } from './types'
+import type { TodoItem, TodoSubItem, TodoSubItemSummary } from './types'
 
 const props = defineProps<{
   todos: TodoItem[]
   selectedIds: number[]
-  editingId: number | null
-  editTodoForm: TodoDraft
   viewMode: 'ACTIVE' | 'RECYCLE_BIN'
   submitting: boolean
   categoryListId: string
@@ -24,12 +22,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:selected', id: number, selected: boolean): void
-  (e: 'update:editForm', value: TodoDraft): void
   (e: 'toggleStatus', todo: TodoItem): void
   (e: 'moveTodo', todo: TodoItem, status: 'PENDING' | 'DONE'): void
   (e: 'startEdit', todo: TodoItem): void
-  (e: 'cancelEdit'): void
-  (e: 'saveEdit', todo: TodoItem): void
   (e: 'deleteTodo', id: number): void
   (e: 'restoreTodo', id: number): void
   (e: 'toggleChecklist', todoId: number): void
@@ -113,8 +108,6 @@ function handleDrop(columnKey: 'PENDING' | 'DONE') {
         <TodoItemRow
           :todo="todo"
           :isSelected="selectedIds.includes(todo.id)"
-          :isEditing="editingId === todo.id"
-          :editForm="editTodoForm"
           :categoryListId="categoryListId"
           :tagListId="tagListId"
           :viewMode="viewMode"
@@ -129,9 +122,6 @@ function handleDrop(columnKey: 'PENDING' | 'DONE') {
           @update:selected="emit('update:selected', todo.id, $event)"
           @toggleStatus="emit('toggleStatus', todo)"
           @startEdit="emit('startEdit', todo)"
-          @update:editForm="emit('update:editForm', $event)"
-          @cancelEdit="emit('cancelEdit')"
-          @saveEdit="emit('saveEdit', todo)"
           @deleteTodo="emit('deleteTodo', todo.id)"
           @restoreTodo="emit('restoreTodo', todo.id)"
           @toggleChecklist="emit('toggleChecklist', todo.id)"

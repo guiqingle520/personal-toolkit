@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import TodoItemRow from './TodoItemRow.vue'
 import { mountWithI18n } from '../../test/test-utils'
-import type { TodoDraft, TodoItem, TodoSubItemSummary } from './types'
+import type { TodoItem, TodoSubItemSummary } from './types'
 
 function createTodo(): TodoItem {
   return {
@@ -25,24 +25,6 @@ function createTodo(): TodoItem {
   }
 }
 
-function createDraft(): TodoDraft {
-  return {
-    title: 'Parent task',
-    priority: 3,
-    category: 'Work',
-    dueDate: '',
-    remindAt: '',
-    tags: 'backend',
-    notes: '',
-    attachmentLinks: '',
-    ownerLabel: '',
-    collaborators: '',
-    watchers: '',
-    recurrenceType: 'daily',
-    recurrenceInterval: 1
-  }
-}
-
 function createSummary(): TodoSubItemSummary {
   return {
     totalCount: 3,
@@ -57,8 +39,6 @@ describe('TodoItemRow', () => {
       props: {
         todo: createTodo(),
         isSelected: false,
-        isEditing: false,
-        editForm: createDraft(),
         categoryListId: 'category-options',
         tagListId: 'tag-options',
         viewMode: 'ACTIVE',

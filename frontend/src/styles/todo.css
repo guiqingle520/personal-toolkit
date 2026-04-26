@@ -24,6 +24,18 @@
   align-items: start;
 }
 
+.workbench-body--no-menu {
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.workbench-body--no-sidebar {
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.workbench-body--no-menu.workbench-body--no-sidebar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .workbench-body::before {
   content: '';
   position: absolute;
@@ -226,7 +238,8 @@
   z-index: 1;
 }
 
-.todo-header {
+.todo-header,
+.workbench-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -237,7 +250,13 @@
   padding-bottom: 24px;
 }
 
-.header-actions {
+.title-group,
+.workbench-header-copy {
+  min-width: 0;
+}
+
+.header-actions,
+.workbench-header-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -247,6 +266,8 @@
 
 .header-actions .btn,
 .header-actions .cyber-input,
+.workbench-header-actions .btn,
+.workbench-header-actions .cyber-input,
 .view-toggle-bar .btn,
 .saved-view-actions .btn,
 .reminder-actions .btn,
@@ -266,7 +287,25 @@
   line-height: 1.1;
 }
 
+.workbench-header-title {
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  color: var(--color-text-strong);
+  line-height: 1.1;
+}
+
 .subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  font-weight: 650;
+}
+
+.workbench-header-summary {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.82rem;
@@ -1057,7 +1096,10 @@
     padding-right: 0;
   }
 
-  .workbench-body {
+  .workbench-body,
+  .workbench-body--no-menu,
+  .workbench-body--no-sidebar,
+  .workbench-body--no-menu.workbench-body--no-sidebar {
     display: grid;
     grid-template-columns: 1fr;
   }
@@ -1076,10 +1118,6 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
-  }
-
-  .workbench-menu-section + .workbench-menu-section {
-    padding-top: 14px;
   }
 
   .workbench-sidebar {
@@ -1142,16 +1180,19 @@
     padding-left: 0;
   }
 
-  .todo-header {
+  .todo-header,
+  .workbench-header {
     align-items: stretch;
   }
 
-  .header-actions {
+  .header-actions,
+  .workbench-header-actions {
     width: 100%;
     justify-content: stretch;
   }
 
-  .header-actions > * {
+  .header-actions > *,
+  .workbench-header-actions > * {
     flex: 1 1 140px;
   }
 

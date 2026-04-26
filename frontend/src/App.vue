@@ -95,69 +95,74 @@ onBeforeUnmount(() => {
 <template>
   <main>
     <div class="app-shell">
-      <div v-if="token" class="app-account-bar">
-        <div ref="accountMenuRef" class="app-account-menu">
-          <button
-            type="button"
-            class="btn btn-outline app-account-trigger"
-            :class="themeToneClass"
-            :aria-expanded="accountMenuOpen"
-            :aria-label="$t('account.menuLabel')"
-            @click="toggleAccountMenu"
-          >
-            <span class="app-account-avatar">{{ accountInitial }}</span>
-            <span class="app-account-trigger-copy">
-              <span class="app-account-trigger-label">{{ accountDisplayName }}</span>
-              <span class="app-account-trigger-meta">{{ $t('account.buttonLabel') }}</span>
-            </span>
-            <span class="app-account-trigger-caret" :class="{ 'is-open': accountMenuOpen }">⌄</span>
-          </button>
+      <AuthScreen v-if="!token" />
 
-          <Transition name="account-menu-fade">
-            <div v-if="accountMenuOpen" class="app-account-dropdown" :class="themeToneClass">
-              <section class="app-account-section">
-                <div class="app-account-section-title">{{ $t('account.management') }}</div>
-                <div class="app-account-card">
-                  <span class="app-account-card-label">{{ $t('account.signedInAs', { value: accountDisplayName }) }}</span>
-                  <strong class="app-account-card-name">{{ accountDisplayName }}</strong>
-                  <span class="app-account-card-meta">{{ accountSecondaryText }}</span>
-                </div>
-                <button type="button" class="btn btn-danger-outline app-account-logout" @click="handleLogout">
-                  {{ $t('auth.logout') }}
-                </button>
-              </section>
+      <div v-else class="app-authenticated-shell">
+        <div class="app-account-bar">
+          <div ref="accountMenuRef" class="app-account-menu">
+            <button
+              type="button"
+              class="btn btn-outline app-account-trigger"
+              :class="themeToneClass"
+              :aria-expanded="accountMenuOpen"
+              :aria-label="$t('account.menuLabel')"
+              @click="toggleAccountMenu"
+            >
+              <span class="app-account-avatar">{{ accountInitial }}</span>
+              <span class="app-account-trigger-copy">
+                <span class="app-account-trigger-label">{{ accountDisplayName }}</span>
+                <span class="app-account-trigger-meta">{{ $t('account.buttonLabel') }}</span>
+              </span>
+              <span class="app-account-trigger-caret" :class="{ 'is-open': accountMenuOpen }">⌄</span>
+            </button>
 
-              <section class="app-account-section">
-                <div class="app-account-section-title">{{ $t('account.themeSettings') }}</div>
-                <div class="app-theme-meta">
-                  <span class="app-theme-label">
-                    <span class="app-theme-orb" :class="themeToneClass"></span>
-                    {{ $t('theme.label') }}
-                  </span>
-                  <span class="app-theme-state">{{ $t('theme.current', { theme: $t(`theme.${resolvedTheme}`) }) }}</span>
-                </div>
-
-                <div class="app-theme-controls" role="group" :aria-label="$t('theme.label')">
-                  <button
-                    v-for="option in themeOptions"
-                    :key="option.value"
-                    type="button"
-                    class="btn btn-outline app-theme-option"
-                    :class="{ 'is-active': theme === option.value }"
-                    :aria-pressed="theme === option.value"
-                    @click="handleThemeChange(option.value)"
-                  >
-                    {{ option.label }}
+            <Transition name="account-menu-fade">
+              <div v-if="accountMenuOpen" class="app-account-dropdown" :class="themeToneClass">
+                <section class="app-account-section">
+                  <div class="app-account-section-title">{{ $t('account.management') }}</div>
+                  <div class="app-account-card">
+                    <span class="app-account-card-label">{{ $t('account.signedInAs', { value: accountDisplayName }) }}</span>
+                    <strong class="app-account-card-name">{{ accountDisplayName }}</strong>
+                    <span class="app-account-card-meta">{{ accountSecondaryText }}</span>
+                  </div>
+                  <button type="button" class="btn btn-danger-outline app-account-logout" @click="handleLogout">
+                    {{ $t('auth.logout') }}
                   </button>
-                </div>
-              </section>
-            </div>
-          </Transition>
+                </section>
+
+                <section class="app-account-section">
+                  <div class="app-account-section-title">{{ $t('account.themeSettings') }}</div>
+                  <div class="app-theme-meta">
+                    <span class="app-theme-label">
+                      <span class="app-theme-orb" :class="themeToneClass"></span>
+                      {{ $t('theme.label') }}
+                    </span>
+                    <span class="app-theme-state">{{ $t('theme.current', { theme: $t(`theme.${resolvedTheme}`) }) }}</span>
+                  </div>
+
+                  <div class="app-theme-controls" role="group" :aria-label="$t('theme.label')">
+                    <button
+                      v-for="option in themeOptions"
+                      :key="option.value"
+                      type="button"
+                      class="btn btn-outline app-theme-option"
+                      :class="{ 'is-active': theme === option.value }"
+                      :aria-pressed="theme === option.value"
+                      @click="handleThemeChange(option.value)"
+                    >
+                      {{ option.label }}
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </Transition>
+          </div>
+        </div>
+
+        <div class="app-workbench-host">
+          <TodoList />
         </div>
       </div>
-
-      <AuthScreen v-if="!token" />
-      <TodoList v-else />
     </div>
   </main>
 </template>
@@ -179,6 +184,20 @@ main {
   flex-direction: column;
   gap: 18px;
   min-height: 100%;
+}
+
+.app-authenticated-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+}
+
+.app-workbench-host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
 .app-account-bar {

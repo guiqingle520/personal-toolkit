@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import TodoItemRow from './TodoItemRow.vue'
-import type { TodoDraft, TodoItem, TodoSubItem, TodoSubItemSummary } from './types'
+import type { TodoItem, TodoSubItem, TodoSubItemSummary } from './types'
 
 defineProps<{
   todos: TodoItem[]
   selectedIds: number[]
-  editingId: number | null
-  editTodoForm: TodoDraft
   viewMode: 'ACTIVE' | 'RECYCLE_BIN'
   submitting: boolean
   categoryListId: string
@@ -22,11 +20,8 @@ defineProps<{
 
 defineEmits<{
   (e: 'update:selected', id: number, selected: boolean): void
-  (e: 'update:editForm', value: TodoDraft): void
   (e: 'toggleStatus', todo: TodoItem): void
   (e: 'startEdit', todo: TodoItem): void
-  (e: 'cancelEdit'): void
-  (e: 'saveEdit', todo: TodoItem): void
   (e: 'deleteTodo', id: number): void
   (e: 'restoreTodo', id: number): void
   (e: 'toggleChecklist', todoId: number): void
@@ -45,8 +40,6 @@ defineEmits<{
       :todo="todo"
       :isSelected="selectedIds.includes(todo.id)"
       @update:selected="$emit('update:selected', todo.id, $event)"
-      :isEditing="editingId === todo.id"
-      :editForm="editTodoForm"
       :categoryListId="categoryListId"
       :tagListId="tagListId"
       :viewMode="viewMode"
@@ -60,9 +53,6 @@ defineEmits<{
       :checklistPendingIds="checklistPendingSubItemIdsByTodoId[todo.id] || []"
       @toggleStatus="$emit('toggleStatus', todo)"
       @startEdit="$emit('startEdit', todo)"
-      @update:editForm="$emit('update:editForm', $event)"
-      @cancelEdit="$emit('cancelEdit')"
-      @saveEdit="$emit('saveEdit', todo)"
       @deleteTodo="$emit('deleteTodo', todo.id)"
       @restoreTodo="$emit('restoreTodo', todo.id)"
       @toggleChecklist="$emit('toggleChecklist', todo.id)"

@@ -10,6 +10,7 @@ const en = {
     recycleBin: 'Recycle Bin',
     listView: 'List View',
     kanbanView: 'Kanban View',
+    calendarView: 'Calendar View',
     manageCategories: 'Manage Categories/Tags',
     localeLabel: 'Language',
   },
@@ -210,6 +211,21 @@ const en = {
     hasAccount: 'Already registered?',
     loginLink: 'Login here',
     logout: 'Disconnect'
+  },
+  calendar: {
+    today: 'Today',
+    mon: 'Mon',
+    tue: 'Tue',
+    wed: 'Wed',
+    thu: 'Thu',
+    fri: 'Fri',
+    sat: 'Sat',
+    sun: 'Sun',
+    more: '+{count} more',
+    emptyMonth: 'No due dates this month',
+    eventsCount: '{count} scheduled',
+    prevMonth: 'Previous month',
+    nextMonth: 'Next month'
   }
 }
 

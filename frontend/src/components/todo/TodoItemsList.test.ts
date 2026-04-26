@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import TodoItemsList from './TodoItemsList.vue'
 import { mountWithI18n } from '../../test/test-utils'
-import type { TodoDraft, TodoItem, TodoSubItemSummary } from './types'
+import type { TodoItem, TodoSubItemSummary } from './types'
 
 function createTodo(overrides: Partial<TodoItem> = {}): TodoItem {
   return {
@@ -15,16 +15,6 @@ function createTodo(overrides: Partial<TodoItem> = {}): TodoItem {
     createTime: '2026-04-07T08:00:00',
     updateTime: '2026-04-07T08:00:00',
     ...overrides,
-  }
-}
-
-function createDraft(): TodoDraft {
-  return {
-    title: 'Draft',
-    priority: 3,
-    category: 'Work',
-    dueDate: '2026-04-07',
-    tags: 'backend',
   }
 }
 
@@ -42,8 +32,6 @@ describe('TodoItemsList', () => {
       props: {
         todos: [createTodo()],
         selectedIds: [],
-        editingId: null,
-        editTodoForm: createDraft(),
         viewMode: 'ACTIVE',
         submitting: false,
         categoryListId: 'category-options',
@@ -79,8 +67,6 @@ describe('TodoItemsList', () => {
       props: {
         todos: [],
         selectedIds: [],
-        editingId: null,
-        editTodoForm: createDraft(),
         viewMode: 'ACTIVE',
         submitting: false,
         categoryListId: 'category-options',

@@ -16,7 +16,7 @@ function createPageData(): PageData<TodoItem> {
 }
 
 describe('TodoToolbar', () => {
-  it('emits refresh and locale change from the top header controls', async () => {
+  it('renders through TodoWorkbenchHeader and emits refresh / locale change', async () => {
     const wrapper = mountWithI18n(TodoToolbar, {
       props: {
         displayMode: 'LIST',
@@ -29,21 +29,23 @@ describe('TodoToolbar', () => {
       },
     })
 
+    expect(wrapper.find('.workbench-header').exists()).toBe(true)
+    expect(wrapper.find('.workbench-header-title').text()).toBe('Tasks')
+
     const select = wrapper.find('#locale-switcher')
     await select.setValue('zh-CN')
     expect(wrapper.emitted('update:locale')?.[0]).toEqual(['zh-CN'])
 
-    const refreshButton = wrapper.find('.header-actions .btn-outline')
+    const refreshButton = wrapper.find('.workbench-refresh-button')
     await refreshButton.trigger('click')
 
     expect(wrapper.emitted('refresh')).toHaveLength(1)
-    expect(wrapper.findAll('.header-actions button')).toHaveLength(1)
     expect(wrapper.emitted('update:viewMode')).toBeUndefined()
     expect(wrapper.emitted('update:displayMode')).toBeUndefined()
     expect(wrapper.emitted('update:showOptionsPanel')).toBeUndefined()
   })
 
-  it('stabilizes the refresh button width to prevent jitter', async () => {
+  it('uses class-based refresh button styling hook', async () => {
     const wrapper = mountWithI18n(TodoToolbar, {
       props: {
         displayMode: 'LIST',
@@ -56,12 +58,12 @@ describe('TodoToolbar', () => {
       },
     })
     
-    const refreshButton = wrapper.find('.header-actions .btn-outline')
-    expect(refreshButton.attributes('style')).toContain('min-width: 100px')
-    expect(refreshButton.attributes('style')).toContain('text-align: center')
+    const refreshButton = wrapper.find('.workbench-refresh-button')
+    expect(refreshButton.exists()).toBe(true)
+    expect(refreshButton.attributes('style')).toBeUndefined()
   })
 
-  it('renders the header summary with total and pending counts', () => {
+  it('renders summary with total and pending counts', () => {
     const wrapper = mountWithI18n(TodoToolbar, {
       props: {
         displayMode: 'LIST',
@@ -74,8 +76,9 @@ describe('TodoToolbar', () => {
       },
     })
 
-    expect(wrapper.find('.title-group h1').text()).toBe('Tasks')
-    expect(wrapper.find('.subtitle').text()).toContain('12 total')
-    expect(wrapper.find('.subtitle').text()).toContain('3 pending')
+    const summary = wrapper.find('.workbench-header-summary')
+    expect(summary.exists()).toBe(true)
+    expect(summary.text()).toContain('12 total')
+    expect(summary.text()).toContain('3 pending')
   })
 })

@@ -36,6 +36,23 @@ describe('App account menu', () => {
     })))
   })
 
+  it('renders authenticated todo workbench inside a dedicated host', () => {
+    const wrapper = mountWithI18n(App)
+
+    expect(wrapper.find('.app-authenticated-shell').exists()).toBe(true)
+    expect(wrapper.find('.app-account-bar').exists()).toBe(true)
+    expect(wrapper.find('.app-workbench-host').exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'TodoList' }).exists()).toBe(true)
+  })
+
+  it('renders TodoList inside the workbench host', () => {
+    const wrapper = mountWithI18n(App)
+
+    const workbenchHost = wrapper.find('.app-workbench-host')
+    expect(workbenchHost.exists()).toBe(true)
+    expect(workbenchHost.findComponent({ name: 'TodoList' }).exists()).toBe(true)
+  })
+
   it('opens account menu and switches theme from theme settings', async () => {
     const wrapper = mountWithI18n(App)
 

@@ -1,7 +1,7 @@
 import type { TodoFiltersModel } from '../components/todo/types'
 
 export type TodoViewMode = 'ACTIVE' | 'RECYCLE_BIN'
-export type TodoDisplayMode = 'LIST' | 'KANBAN'
+export type TodoDisplayMode = 'LIST' | 'KANBAN' | 'CALENDAR'
 
 type TodoUrlState = {
   filters: TodoFiltersModel
@@ -98,7 +98,10 @@ export function parseTodoUrlState(search: string): TodoUrlState {
   })
 
   const viewMode = params.get('viewMode') === 'RECYCLE_BIN' ? 'RECYCLE_BIN' : 'ACTIVE'
-  const displayMode = params.get('displayMode') === 'KANBAN' && viewMode === 'ACTIVE' ? 'KANBAN' : 'LIST'
+  const displayModeParam = params.get('displayMode')
+  const displayMode = (displayModeParam === 'KANBAN' || displayModeParam === 'CALENDAR') && viewMode === 'ACTIVE' 
+    ? (displayModeParam as TodoDisplayMode) 
+    : 'LIST'
 
   return { filters, viewMode, displayMode }
 }

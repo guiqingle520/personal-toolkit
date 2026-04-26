@@ -10,6 +10,7 @@ const zhCN = {
     recycleBin: '回收站',
     listView: '列表视图',
     kanbanView: '看板视图',
+    calendarView: '日历视图',
     manageCategories: '管理分类/标签',
     localeLabel: '语言',
   },
@@ -194,22 +195,37 @@ const zhCN = {
     dropHere: '拖到这里'
   },
   auth: {
-    loginTitle: '系统登录',
-    registerTitle: '建立连接',
+    loginTitle: '接入终端',
+    registerTitle: '初始化连接',
     username: '用户名',
     loginIdentifier: '用户名或邮箱',
     password: '密码',
     email: '邮箱',
     captcha: '验证码',
-    captchaPlaceholder: '请输入验证码',
+    captchaPlaceholder: '输入验证码',
     refreshCaptcha: '刷新验证码',
     loginBtn: '登录',
     registerBtn: '注册',
-    noAccount: '尚未获得权限？',
-    registerLink: '申请账号',
-    hasAccount: '已有通行证？',
-    loginLink: '立即登录',
+    noAccount: '没有凭证？',
+    registerLink: '创建账号',
+    hasAccount: '已注册？',
+    loginLink: '在此登录',
     logout: '断开连接'
+  },
+  calendar: {
+    today: '今天',
+    mon: '周一',
+    tue: '周二',
+    wed: '周三',
+    thu: '周四',
+    fri: '周五',
+    sat: '周六',
+    sun: '周日',
+    more: '还有 {count} 项',
+    emptyMonth: '本月没有截止日期任务',
+    eventsCount: '共 {count} 项',
+    prevMonth: '上个月',
+    nextMonth: '下个月'
   }
 }
 
