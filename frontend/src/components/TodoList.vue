@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 
 import TodoToolbar from './todo/TodoToolbar.vue'
 import TodoWorkbenchLayout from './todo/TodoWorkbenchLayout.vue'
 import TodoEditDrawer from './todo/TodoEditDrawer.vue'
 import TodoOptionsPanel from './todo/TodoOptionsPanel.vue'
-import TodoStatsPanel from './todo/TodoStatsPanel.vue'
 import TodoFilters from './todo/TodoFilters.vue'
 import TodoCreateForm from './todo/TodoCreateForm.vue'
 import TodoEmptyState from './todo/TodoEmptyState.vue'
@@ -16,7 +16,8 @@ import TodoKanbanView from './todo/TodoKanbanView.vue'
 import TodoReminderPanel from './todo/TodoReminderPanel.vue'
 import TodoSavedViewsBar from './todo/TodoSavedViewsBar.vue'
 import TodoCalendarView from './todo/TodoCalendarView.vue'
-import type { PageData, TodoDraft, TodoFiltersModel, TodoItem, TodoOptions, TodoReminderItem, TodoSavedView, TodoSubItem, TodoSubItemSummary, TodoStatsOverview, TodoStatsCategoryItem, TodoStatsTrend, TodoStatsTrendItem } from './todo/types'
+import TodoSidebarNav from './todo/TodoSidebarNav.vue'
+import type { PageData, TodoDraft, TodoFiltersModel, TodoItem, TodoOptions, TodoReminderItem, TodoSavedView, TodoSubItem, TodoSubItemSummary } from './todo/types'
 
 function handleSelectedUpdate(id: number, selected: boolean) {
   if (selected) {
@@ -37,11 +38,16 @@ import {
   parseTodoUrlState,
   serializeTodoUrlState,
   toDateTimeValue,
+  type TodoDisplayMode,
+  type TodoViewMode,
 } from '../utils/todoView'
+import { saveLastTasksPath } from '../utils/taskRouteMemory'
 import { fetchApi } from '../api'
 import type { ApiError } from '../api'
 
 const { t, locale } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 const todos = ref<TodoItem[]>([])
 const pageData = ref<PageData<TodoItem> | null>(null)
@@ -51,9 +57,6 @@ const errorMessage = ref('')
 const infoMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
 
-const statsOverview = ref<TodoStatsOverview | null>(null)
-const statsCategories = ref<TodoStatsCategoryItem[]>([])
-const statsTrend = ref<TodoStatsTrendItem[]>([])
 const reminders = ref<TodoReminderItem[]>([])
 const reminderLoading = ref(false)
 const savedViews = ref<TodoSavedView[]>([])
@@ -102,8 +105,8 @@ const filters = ref<TodoFiltersModel>(createDefaultTodoFilters())
 
 const pendingCount = computed(() => todos.value.filter(t => t.status !== 'DONE').length)
 
-const viewMode = ref<'ACTIVE' | 'RECYCLE_BIN'>('ACTIVE')
-const displayMode = ref<'LIST' | 'KANBAN' | 'CALENDAR'>('LIST')
+const viewMode = ref<TodoViewMode>('ACTIVE')
+const displayMode = ref<TodoDisplayMode>('LIST')
 const selectedIds = ref<number[]>([])
 const options = ref<TodoOptions>({ categories: [], tags: [] })
 const showOptionsPanel = ref(false)
@@ -131,11 +134,6 @@ watch(viewMode, () => {
   filters.value.page = 0
   if (viewMode.value !== 'ACTIVE') displayMode.value = 'LIST'
   expandedTodoIds.value = []
-  if (viewMode.value !== 'ACTIVE') {
-    statsOverview.value = null
-    statsCategories.value = []
-    statsTrend.value = []
-  }
   syncUrlState(false)
   loadTodos()
 })
@@ -149,13 +147,62 @@ function handleLocaleUpdate(nextLocale: AppLocale) {
   locale.value = nextLocale
 }
 
-function handleDisplayModeUpdate(nextDisplayMode: 'LIST' | 'KANBAN' | 'CALENDAR') {
+function handleDisplayModeUpdate(nextDisplayMode: TodoDisplayMode) {
   displayMode.value = viewMode.value === 'ACTIVE' ? nextDisplayMode : 'LIST'
   syncUrlState(false)
 }
 
-function handleViewModeUpdate(nextViewMode: 'ACTIVE' | 'RECYCLE_BIN') {
+function handleViewModeUpdate(nextViewMode: TodoViewMode) {
   viewMode.value = nextViewMode
+}
+
+function handleShowOptionsPanelUpdate(nextValue: boolean) {
+  showOptionsPanel.value = nextValue
+  syncUrlState(false)
+}
+
+function routeQueryToSearch() {
+  const params = new URLSearchParams()
+
+  Object.entries(route.query).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      const lastValue = value[value.length - 1]
+      if (typeof lastValue === 'string') {
+        params.set(key, lastValue)
+      }
+      return
+    }
+
+    if (typeof value === 'string') {
+      params.set(key, value)
+    }
+  })
+
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+function buildTasksQuery() {
+  const params = new URLSearchParams(serializeTodoUrlState(currentUrlState()))
+  if (showOptionsPanel.value) {
+    params.set('options', '1')
+  }
+  return Object.fromEntries(params.entries())
+}
+
+function isCurrentRouteState(search: string) {
+  const parsedState = parseTodoUrlState(search)
+  const currentState = serializeTodoUrlState(currentUrlState())
+  const parsedQuery = serializeTodoUrlState(parsedState)
+  const currentOptions = showOptionsPanel.value ? '1' : ''
+  const parsedOptions = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('options') || ''
+
+  return currentState === parsedQuery && currentOptions === parsedOptions
+}
+
+function navigateToStatistics() {
+  saveLastTasksPath(route.fullPath)
+  void router.push({ name: 'statistics' })
 }
 
 function handleFiltersUpdate(nextFilters: TodoFiltersModel) {
@@ -355,30 +402,6 @@ function handleError(error: unknown) {
   }
 }
 
-async function loadStats() {
-  if (viewMode.value !== 'ACTIVE') {
-    statsOverview.value = null
-    statsCategories.value = []
-    statsTrend.value = []
-    return
-  }
-
-  try {
-    const [overviewRes, categoryRes, trendRes] = await Promise.all([
-      fetchApi<TodoStatsOverview>('/api/todos/stats/overview'),
-      fetchApi<TodoStatsCategoryItem[]>('/api/todos/stats/by-category'),
-      fetchApi<TodoStatsTrend>('/api/todos/stats/trend?range=7d')
-    ])
-    statsOverview.value = overviewRes.data || null
-    statsCategories.value = categoryRes.data || []
-    statsTrend.value = trendRes.data?.items || []
-  } catch (error) {
-    statsOverview.value = null
-    statsCategories.value = []
-    statsTrend.value = []
-  }
-}
-
 async function loadTodos() {
   loading.value = true
   errorMessage.value = ''
@@ -398,9 +421,6 @@ async function loadTodos() {
     todos.value = response.data?.content || []
     hydrateChecklistSummaries(todos.value)
     reconcileSelectedIds()
-    if (viewMode.value === 'ACTIVE') {
-      loadStats()
-    }
   } catch (error) {
     handleError(error)
   } finally {
@@ -482,31 +502,39 @@ function currentUrlState() {
 }
 
 function syncUrlState(replace: boolean) {
-  if (typeof window === 'undefined' || syncingFromUrl.value) {
+  if (syncingFromUrl.value) {
     return
   }
 
-  const query = serializeTodoUrlState(currentUrlState())
-  const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname
-  const currentUrl = `${window.location.pathname}${window.location.search}`
-  if (nextUrl === currentUrl) {
+  const nextQuery = buildTasksQuery()
+  const currentQuery = Object.fromEntries(Object.entries(route.query).flatMap(([key, value]) => {
+    if (Array.isArray(value)) {
+      const lastValue = value[value.length - 1]
+      return lastValue ? [[key, lastValue]] : []
+    }
+
+    return typeof value === 'string' ? [[key, value]] : []
+  }))
+
+  if (JSON.stringify(nextQuery) === JSON.stringify(currentQuery)) {
     return
   }
 
-  const state = currentUrlState()
   if (replace) {
-    window.history.replaceState(state, '', nextUrl)
+    void router.replace({ name: 'tasks', query: nextQuery })
   } else {
-    window.history.pushState(state, '', nextUrl)
+    void router.push({ name: 'tasks', query: nextQuery })
   }
 }
 
 function applyUrlState(search: string, options: { skipLoad?: boolean } = {}) {
   syncingFromUrl.value = true
   const parsedState = parseTodoUrlState(search)
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   filters.value = parsedState.filters
   viewMode.value = parsedState.viewMode
   displayMode.value = parsedState.displayMode
+  showOptionsPanel.value = params.get('options') === '1'
   syncingFromUrl.value = false
 
   if (!options.skipLoad) {
@@ -514,17 +542,14 @@ function applyUrlState(search: string, options: { skipLoad?: boolean } = {}) {
   }
 }
 
-function handlePopState() {
-  applyUrlState(window.location.search)
-}
-
 async function initializeTodoPage() {
   loadOptions()
   loadReminders()
 
-  const hasUrlState = typeof window !== 'undefined' && hasMeaningfulTodoQuery(window.location.search)
+  const routeSearch = routeQueryToSearch()
+  const hasUrlState = hasMeaningfulTodoQuery(routeSearch)
   if (hasUrlState) {
-    applyUrlState(window.location.search, { skipLoad: true })
+    applyUrlState(routeSearch, { skipLoad: true })
   }
 
   const loadedSavedViews = await loadSavedViews()
@@ -602,7 +627,7 @@ async function setDefaultSavedView(id: number) {
 async function markReminderAsRead(id: number) {
   try {
     await fetchApi(`/api/todo-reminders/${id}/read`, { method: 'POST' })
-    await Promise.all([loadReminders(), loadStats()])
+    await loadReminders()
   } catch (error) {
     handleError(error)
   }
@@ -611,7 +636,7 @@ async function markReminderAsRead(id: number) {
 async function markAllRemindersAsRead() {
   try {
     await fetchApi('/api/todo-reminders/read-all', { method: 'POST' })
-    await Promise.all([loadReminders(), loadStats()])
+    await loadReminders()
   } catch (error) {
     handleError(error)
   }
@@ -619,6 +644,7 @@ async function markAllRemindersAsRead() {
 
 function openReminderTodo(todoId: number) {
   displayMode.value = 'LIST'
+  syncUrlState(false)
   const targetTodo = todos.value.find((todo) => todo.id === todoId)
   if (targetTodo) {
     startEdit(targetTodo)
@@ -831,9 +857,6 @@ async function deleteTodo(id: number) {
 }
 
 onMounted(() => {
-  if (typeof window !== 'undefined') {
-    window.addEventListener('popstate', handlePopState)
-  }
   initializeTodoPage()
 })
 
@@ -841,10 +864,29 @@ onBeforeUnmount(() => {
   if (infoMessageTimer) {
     clearTimeout(infoMessageTimer)
   }
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('popstate', handlePopState)
-  }
 })
+
+watch(
+  () => route.query,
+  () => {
+    const search = routeQueryToSearch()
+    if (!search || syncingFromUrl.value || isCurrentRouteState(search)) {
+      return
+    }
+
+    applyUrlState(search)
+  },
+)
+
+watch(
+  () => route.fullPath,
+  (fullPath) => {
+    if (route.name === 'tasks') {
+      saveLastTasksPath(fullPath)
+    }
+  },
+  { immediate: true },
+)
 
 async function loadOptions() {
   try {
@@ -1042,81 +1084,16 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
       </datalist>
 
         <template #menu>
-          <div class="workbench-menu-panel">
-            <div class="workbench-menu-section">
-              <span class="workbench-menu-label">{{ $t('app.title') }}</span>
-              <div class="workbench-menu-group">
-                <button
-                  type="button"
-                  class="btn btn-outline workbench-menu-button"
-                  :class="{ 'is-active': viewMode === 'ACTIVE' }"
-                  :aria-pressed="viewMode === 'ACTIVE'"
-                  @click="handleViewModeUpdate('ACTIVE')"
-                >
-                  {{ $t('app.activeTasks') }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-outline workbench-menu-button"
-                  :class="{ 'is-active': viewMode === 'RECYCLE_BIN' }"
-                  :aria-pressed="viewMode === 'RECYCLE_BIN'"
-                  @click="handleViewModeUpdate('RECYCLE_BIN')"
-                >
-                  {{ $t('app.recycleBin') }}
-                </button>
-              </div>
-            </div>
-
-            <div class="workbench-menu-section">
-              <span class="workbench-menu-label">{{ $t('app.listView') }} / {{ $t('app.kanbanView') }} / {{ $t('app.calendarView') }}</span>
-              <div class="workbench-menu-group">
-                <button
-                  type="button"
-                  class="btn btn-outline workbench-menu-button"
-                  :class="{ 'is-active': displayMode === 'LIST' }"
-                  :aria-pressed="displayMode === 'LIST'"
-                  @click="handleDisplayModeUpdate('LIST')"
-                >
-                  {{ $t('app.listView') }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-outline workbench-menu-button"
-                  :class="{ 'is-active': displayMode === 'KANBAN' }"
-                  :aria-pressed="displayMode === 'KANBAN'"
-                  :disabled="viewMode !== 'ACTIVE'"
-                  @click="handleDisplayModeUpdate('KANBAN')"
-                >
-                  {{ $t('app.kanbanView') }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-outline workbench-menu-button"
-                  :class="{ 'is-active': displayMode === 'CALENDAR' }"
-                  :aria-pressed="displayMode === 'CALENDAR'"
-                  :disabled="viewMode !== 'ACTIVE'"
-                  @click="handleDisplayModeUpdate('CALENDAR')"
-                >
-                  {{ $t('app.calendarView') }}
-                </button>
-              </div>
-            </div>
-
-            <div class="workbench-menu-section">
-              <span class="workbench-menu-label">{{ $t('options.knownCategories') }}</span>
-              <div class="workbench-menu-group">
-                <button
-                  type="button"
-                  class="btn btn-outline workbench-menu-button"
-                  :class="{ 'is-active': showOptionsPanel }"
-                  :aria-pressed="showOptionsPanel"
-                  @click="showOptionsPanel = !showOptionsPanel"
-                >
-                  {{ $t('app.manageCategories') }}
-                </button>
-              </div>
-            </div>
-          </div>
+          <TodoSidebarNav
+            route-name="tasks"
+            :view-mode="viewMode"
+            :display-mode="displayMode"
+            :show-options-panel="showOptionsPanel"
+            @navigate:statistics="navigateToStatistics"
+            @update:viewMode="handleViewModeUpdate"
+            @update:displayMode="handleDisplayModeUpdate"
+            @update:showOptionsPanel="handleShowOptionsPanelUpdate"
+          />
         </template>
 
           <TodoOptionsPanel 
@@ -1255,13 +1232,6 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
           />
 
         <template #sidebar>
-          <TodoStatsPanel 
-            v-if="viewMode === 'ACTIVE'"
-            :overview="statsOverview"
-            :categories="statsCategories"
-            :trend="statsTrend"
-          />
-
           <TodoReminderPanel
             v-if="viewMode === 'ACTIVE'"
             :reminders="reminders"

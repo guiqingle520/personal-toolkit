@@ -13,6 +13,11 @@ const zhCN = {
     calendarView: '日历视图',
     manageCategories: '管理分类/标签',
     localeLabel: '语言',
+    tasks: '任务',
+    statistics: '数据统计',
+    insights: '洞察',
+    settings: '设置',
+    views: '视图',
   },
   locale: {
     en: '英文',
@@ -186,7 +191,15 @@ const zhCN = {
     activeLabel: '活动：{count}',
     completedLabel: '完成：{count}',
     completedOnlyLabel: '完成：{count}',
-    empty: '暂无数据'
+    empty: '暂无数据',
+    snapshotTitle: '完成快照',
+    trendTotalCompleted: '已展示趋势完成总数',
+    averagePerShownDay: '展示日均完成',
+    activeDays: '有完成的天数',
+    peakDay: '峰值日期',
+    totalTasks: '共 {count} 项',
+    completionRate: '完成率：{rate}%',
+    shareOfTrackedTotal: '占已跟踪总量 {share}%'
   },
   kanban: {
     pendingColumn: '待办',

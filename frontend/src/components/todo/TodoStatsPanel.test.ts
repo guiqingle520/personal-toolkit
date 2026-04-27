@@ -6,7 +6,7 @@ import TodoStatsPanel from './TodoStatsPanel.vue'
 import en from '../../locales/en'
 import zhCN from '../../locales/zh-CN'
 
-function mountWithLocale(locale: 'en' | 'zh-CN' = 'en') {
+function mountWithLocale(locale: 'en' | 'zh-CN' = 'en', pageMode = false) {
   return mount(TodoStatsPanel, {
     props: {
       overview: {
@@ -25,6 +25,7 @@ function mountWithLocale(locale: 'en' | 'zh-CN' = 'en') {
         { date: '2026-04-01', completedCount: 1 },
         { date: '2026-04-02', completedCount: 2 },
       ],
+      pageMode,
     },
     global: {
       plugins: [createI18n({
@@ -62,5 +63,25 @@ describe('TodoStatsPanel', () => {
     expect(wrapper.text()).toContain('未分类')
     expect(wrapper.text()).toContain('活动：3')
     expect(wrapper.text()).toContain('完成：1')
+  })
+
+  it('renders page-mode dashboard sections with stable hooks', () => {
+    const wrapper = mountWithLocale('en', true)
+
+    expect(wrapper.find('[data-testid="page-stats-dashboard"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stats-kpi-grid"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="stats-kpi-card"]')).toHaveLength(6)
+    expect(wrapper.find('[data-testid="stats-trend-section"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="stats-trend-bar"]')).toHaveLength(2)
+    expect(wrapper.find('[data-testid="stats-trend-snapshot"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stats-categories-section"]').exists()).toBe(true)
+  })
+
+  it('sorts category rows deterministically in page mode', () => {
+    const wrapper = mountWithLocale('en', true)
+    const rows = wrapper.findAll('[data-testid="stats-category-row"]')
+
+    expect(rows[0]?.attributes('data-category-key')).toBe('Work')
+    expect(rows[1]?.attributes('data-category-key')).toBe('__UNCLASSIFIED__')
   })
 })

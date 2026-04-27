@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterView } from 'vue-router'
 
-import TodoList from './components/TodoList.vue'
 import AuthScreen from './components/auth/AuthScreen.vue'
 import { useAuth } from './composables/useAuth'
 import { fetchApi } from './api'
@@ -160,7 +160,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="app-workbench-host">
-          <TodoList />
+          <RouterView />
         </div>
       </div>
     </div>

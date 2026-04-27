@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { TodoStatsOverview, TodoStatsCategoryItem, TodoStatsTrendItem } from './types'
+
+import type { TodoStatsCategoryItem, TodoStatsOverview, TodoStatsTrendItem } from './types'
+import {
+  buildDashboardCategories,
+  buildDashboardKpis,
+  buildDashboardSnapshot,
+  buildDashboardTrend,
+} from './todoStatsDashboard'
 
 const props = defineProps<{
   overview: TodoStatsOverview | null
   categories: TodoStatsCategoryItem[]
   trend: TodoStatsTrendItem[]
+  pageMode?: boolean
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const displayCategories = computed(() => {
   return props.categories.map((categoryItem) => ({
@@ -22,10 +30,132 @@ const maxTrendValue = computed(() => {
   if (!props.trend.length) return 0
   return Math.max(...props.trend.map((trendItem) => trendItem.completedCount))
 })
+
+const intlDateLabel = computed(() => new Intl.DateTimeFormat(locale.value.startsWith('zh') ? 'zh-CN' : 'en-US', {
+  month: '2-digit',
+  day: '2-digit',
+}))
+
+const dashboardKpis = computed(() => props.overview ? buildDashboardKpis(props.overview) : [])
+
+const dashboardTrend = computed(() => buildDashboardTrend(props.trend, (date) => {
+  return intlDateLabel.value.format(new Date(`${date}T00:00:00`))
+}))
+
+const dashboardSnapshot = computed(() => buildDashboardSnapshot(dashboardTrend.value))
+
+const dashboardCategories = computed(() => buildDashboardCategories(props.categories, (category) => {
+  return category === '__UNCLASSIFIED__' ? t('stats.uncategorized') : category
+}))
 </script>
 
 <template>
-  <div class="todo-stats-panel" v-if="overview">
+  <div v-if="overview && pageMode" class="todo-dashboard-page" data-testid="page-stats-dashboard">
+    <div class="dashboard-kpi-grid" data-testid="stats-kpi-grid">
+      <div
+        v-for="kpi in dashboardKpis"
+        :key="kpi.key"
+        class="kpi-card"
+        data-testid="stats-kpi-card"
+        :data-metric-key="kpi.key"
+      >
+        <div class="kpi-icon">{{ kpi.icon }}</div>
+        <div class="kpi-info">
+          <div class="kpi-label">{{ t(`stats.${kpi.key}`) }}</div>
+          <div class="kpi-value" :class="kpi.toneClass">{{ kpi.value }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-main-grid">
+      <div class="dashboard-col-main">
+        <div class="dashboard-card trend-section" data-testid="stats-trend-section">
+          <h3>{{ t('stats.trend7d') }}</h3>
+          <div v-if="!dashboardTrend.length" class="empty-stats">{{ t('stats.empty') }}</div>
+          <div v-else class="trend-chart-lg">
+            <div
+              v-for="day in dashboardTrend"
+              :key="day.date"
+              class="trend-day-lg"
+              data-testid="stats-trend-bar"
+              :data-date="day.date"
+              :data-peak="day.isPeak ? '1' : '0'"
+            >
+              <div class="bars-lg">
+                <div
+                  class="bar-lg completed-bar"
+                  :class="{ 'is-peak': day.isPeak }"
+                  :style="{ height: maxTrendValue ? `${(day.completedCount / maxTrendValue) * 100}%` : '0' }"
+                  :title="t('stats.completedOnlyLabel', { count: day.completedCount })"
+                >
+                  <span v-if="day.completedCount > 0" class="bar-value">{{ day.completedCount }}</span>
+                </div>
+              </div>
+              <div class="day-label-lg">{{ day.label }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-card snapshot-section" data-testid="stats-trend-snapshot">
+          <h3>{{ t('stats.snapshotTitle') }}</h3>
+          <div class="snapshot-grid">
+            <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="trendTotalCompleted">
+              <span class="snapshot-label">{{ t('stats.trendTotalCompleted') }}</span>
+              <span class="snapshot-value text-success">{{ dashboardSnapshot.totalCompleted }}</span>
+            </div>
+            <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="averagePerShownDay">
+              <span class="snapshot-label">{{ t('stats.averagePerShownDay') }}</span>
+              <span class="snapshot-value text-primary">{{ dashboardSnapshot.averagePerShownDay }}</span>
+            </div>
+            <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="activeDays">
+              <span class="snapshot-label">{{ t('stats.activeDays') }}</span>
+              <span class="snapshot-value">{{ dashboardSnapshot.activeDays }}</span>
+            </div>
+            <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="peakDay">
+              <span class="snapshot-label">{{ t('stats.peakDay') }}</span>
+              <span class="snapshot-value snapshot-value--compact">
+                {{ dashboardSnapshot.peakDate || '—' }}
+                <small v-if="dashboardSnapshot.peakCompletedCount">{{ dashboardSnapshot.peakCompletedCount }}</small>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-col-side">
+        <div class="dashboard-card category-section" data-testid="stats-categories-section">
+          <h3>{{ t('stats.categoryStats') }}</h3>
+          <div v-if="!dashboardCategories.length" class="empty-stats">{{ t('stats.empty') }}</div>
+          <ul v-else class="category-dist-list">
+            <li
+              v-for="(cat, index) in dashboardCategories"
+              :key="cat.categoryKey"
+              class="category-dist-item"
+              data-testid="stats-category-row"
+              :data-category-key="cat.categoryKey"
+            >
+              <div class="cat-header">
+                <span class="cat-rank">#{{ index + 1 }}</span>
+                <span class="cat-name-lg">{{ cat.displayName }}</span>
+                <span class="cat-total">{{ t('stats.totalTasks', { count: cat.totalCount }) }}</span>
+              </div>
+              <div class="cat-progress-bar" :title="t('stats.completionRate', { rate: cat.completionRate })">
+                <div class="cat-progress-fill cat-progress-fill--completed" :style="{ width: `${cat.completionRate}%` }"></div>
+                <div class="cat-progress-fill cat-progress-fill--active" :style="{ width: `${Math.max(0, 100 - cat.completionRate)}%` }"></div>
+              </div>
+              <div class="cat-details">
+                <span class="cat-count-sm active">{{ t('stats.activeLabel', { count: cat.activeCount }) }}</span>
+                <span class="cat-count-sm completed">{{ t('stats.completedLabel', { count: cat.completedCount }) }}</span>
+                <span class="cat-count-sm share">{{ t('stats.shareOfTrackedTotal', { share: cat.shareOfTotal }) }}</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-else-if="overview" class="todo-stats-panel" :class="{ 'page-mode': pageMode }">
     <div class="stats-panel-title">{{ t('stats.panelTitle') }}</div>
 
     <div class="stats-overview">
@@ -74,12 +204,14 @@ const maxTrendValue = computed(() => {
         <h3>{{ t('stats.trend7d') }}</h3>
         <div v-if="!trend.length" class="empty-stats">{{ t('stats.empty') }}</div>
         <div v-else class="trend-chart">
-          <div class="trend-day" v-for="day in trend" :key="day.date">
+          <div v-for="day in trend" :key="day.date" class="trend-day">
             <div class="trend-value">{{ day.completedCount }}</div>
             <div class="bars">
-              <div class="bar completed-bar"
-                   :style="{ height: maxTrendValue ? `${(day.completedCount / maxTrendValue) * 100}%` : '0' }"
-                   :title="`${t('stats.completedOnlyLabel', { count: day.completedCount })}`"></div>
+              <div
+                class="bar completed-bar"
+                :style="{ height: maxTrendValue ? `${(day.completedCount / maxTrendValue) * 100}%` : '0' }"
+                :title="t('stats.completedOnlyLabel', { count: day.completedCount })"
+              ></div>
             </div>
             <div class="day-label">{{ day.date.substring(5) }}</div>
           </div>

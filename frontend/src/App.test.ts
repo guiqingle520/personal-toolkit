@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App.vue'
-import { mountWithI18n } from './test/test-utils'
+import { mountWithI18nAndRouter } from './test/test-utils'
 
 const clearTokenMock = vi.fn()
 
@@ -36,8 +36,8 @@ describe('App account menu', () => {
     })))
   })
 
-  it('renders authenticated todo workbench inside a dedicated host', () => {
-    const wrapper = mountWithI18n(App)
+  it('renders authenticated todo workbench inside a dedicated host', async () => {
+    const { wrapper } = await mountWithI18nAndRouter(App, { route: '/tasks' })
 
     expect(wrapper.find('.app-authenticated-shell').exists()).toBe(true)
     expect(wrapper.find('.app-account-bar').exists()).toBe(true)
@@ -45,16 +45,24 @@ describe('App account menu', () => {
     expect(wrapper.findComponent({ name: 'TodoList' }).exists()).toBe(true)
   })
 
-  it('renders TodoList inside the workbench host', () => {
-    const wrapper = mountWithI18n(App)
+  it('renders TodoList inside the workbench host for /tasks', async () => {
+    const { wrapper } = await mountWithI18nAndRouter(App, { route: '/tasks' })
 
     const workbenchHost = wrapper.find('.app-workbench-host')
     expect(workbenchHost.exists()).toBe(true)
     expect(workbenchHost.findComponent({ name: 'TodoList' }).exists()).toBe(true)
   })
 
+  it('renders statistics route inside the workbench host', async () => {
+    const { wrapper } = await mountWithI18nAndRouter(App, { route: '/statistics' })
+
+    const workbenchHost = wrapper.find('.app-workbench-host')
+    expect(workbenchHost.exists()).toBe(true)
+    expect(workbenchHost.findComponent({ name: 'TodoStatisticsView' }).exists()).toBe(true)
+  })
+
   it('opens account menu and switches theme from theme settings', async () => {
-    const wrapper = mountWithI18n(App)
+    const { wrapper } = await mountWithI18nAndRouter(App, { route: '/tasks' })
 
     await wrapper.find('.app-account-trigger').trigger('click')
 
@@ -70,7 +78,7 @@ describe('App account menu', () => {
   })
 
   it('logs out from the account menu', async () => {
-    const wrapper = mountWithI18n(App)
+    const { wrapper } = await mountWithI18nAndRouter(App, { route: '/tasks' })
 
     await wrapper.find('.app-account-trigger').trigger('click')
     await wrapper.find('.app-account-logout').trigger('click')

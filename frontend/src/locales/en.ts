@@ -13,6 +13,11 @@ const en = {
     calendarView: 'Calendar View',
     manageCategories: 'Manage Categories/Tags',
     localeLabel: 'Language',
+    tasks: 'Tasks',
+    statistics: 'Statistics',
+    insights: 'Insights',
+    settings: 'Settings',
+    views: 'Views',
   },
   locale: {
     en: 'English',
@@ -186,7 +191,15 @@ const en = {
     activeLabel: 'Active: {count}',
     completedLabel: 'Completed: {count}',
     completedOnlyLabel: 'Completed: {count}',
-    empty: 'No stats available'
+    empty: 'No stats available',
+    snapshotTitle: 'Completion Snapshot',
+    trendTotalCompleted: 'Completed in shown trend',
+    averagePerShownDay: 'Average per shown day',
+    activeDays: 'Days with completions',
+    peakDay: 'Peak day',
+    totalTasks: '{count} tasks',
+    completionRate: 'Completion rate: {rate}%',
+    shareOfTrackedTotal: '{share}% of tracked total'
   },
   kanban: {
     pendingColumn: 'Pending',
