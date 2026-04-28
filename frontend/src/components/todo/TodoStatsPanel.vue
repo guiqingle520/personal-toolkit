@@ -36,6 +36,14 @@ const props = defineProps<{
   reminderSummary?: TodoReminderSummary | null
   recurrenceDistribution?: TodoStatsRecurrenceDistribution | null
   pageMode?: boolean
+  trendRange?: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:trendRange', range: string): void
+  (e: 'click:due', bucketKey: string): void
+  (e: 'click:priority', priority: number): void
+  (e: 'click:recurrence', recurrenceType: string): void
 }>()
 
 const { t, locale } = useI18n()
@@ -59,9 +67,31 @@ const intlDateLabel = computed(() => new Intl.DateTimeFormat(locale.value.starts
 
 const dashboardKpis = computed(() => props.overview ? buildDashboardKpis(props.overview) : [])
 
-const dashboardTrend = computed(() => buildDashboardTrend(props.trend, (date) => {
-  return intlDateLabel.value.format(new Date(`${date}T00:00:00`))
-}))
+const dashboardTrend = computed(() => {
+  const baseTrend = buildDashboardTrend(props.trend, (date) => {
+    return intlDateLabel.value.format(new Date(`${date}T00:00:00`))
+  })
+  
+  const len = baseTrend.length
+  if (len === 0) return []
+  
+  let interval = 1
+  const range = props.trendRange || '7d'
+  
+  if (range === '90d' || len > 31) {
+    interval = 14
+  } else if (range === '30d' || len > 14) {
+    interval = 5
+  }
+  
+  return baseTrend.map((day, i) => {
+    const distance = len - 1 - i
+    return {
+      ...day,
+      showLabel: distance % interval === 0
+    }
+  })
+})
 
 const dashboardSnapshot = computed(() => buildDashboardSnapshot(dashboardTrend.value, props.trendSummary))
 
@@ -101,13 +131,25 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
     <div class="dashboard-main-grid">
       <div class="dashboard-col-main">
         <div class="dashboard-card trend-section" data-testid="stats-trend-section">
-          <h3>{{ t('stats.trend7d') }}</h3>
+          <div class="trend-header">
+            <h3>{{ t('stats.trendTitle') }}</h3>
+            <select
+              class="trend-range-select"
+              :value="trendRange || '7d'"
+              @change="emit('update:trendRange', ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="7d">{{ t('stats.trend7d') }}</option>
+              <option value="30d">{{ t('stats.trend30d') }}</option>
+              <option value="90d">{{ t('stats.trend90d') }}</option>
+            </select>
+          </div>
           <div v-if="!dashboardTrend.length" class="empty-stats">{{ t('stats.empty') }}</div>
-          <div v-else class="trend-chart-lg">
-            <div
-              v-for="day in dashboardTrend"
-              :key="day.date"
-              class="trend-day-lg"
+          <div v-else class="trend-chart-wrapper" :class="`range-${trendRange || '7d'}`">
+            <div class="trend-chart-lg">
+              <div
+                v-for="day in dashboardTrend"
+                :key="day.date"
+                class="trend-day-lg"
               data-testid="stats-trend-bar"
               :data-date="day.date"
               :data-peak="day.isPeak ? '1' : '0'"
@@ -129,9 +171,10 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
                   <span v-if="day.completedCount > 0" class="bar-value">{{ day.completedCount }}</span>
                 </div>
               </div>
-              <div class="day-label-lg">{{ day.label }}</div>
+              <div class="day-label-lg" v-show="day.showLabel">{{ day.label }}</div>
             </div>
           </div>
+        </div>
         </div>
 
         <div class="dashboard-card snapshot-section" data-testid="stats-trend-snapshot">
@@ -203,7 +246,13 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
         <div v-if="dashboardDueBuckets.length" class="dashboard-card due-section" data-testid="stats-due-section">
           <h3>{{ t('stats.dueBuckets') }}</h3>
           <ul class="dist-list">
-            <li v-for="bucket in dashboardDueBuckets" :key="bucket.key" class="dist-item">
+            <li
+              v-for="bucket in dashboardDueBuckets"
+              :key="bucket.key"
+              class="dist-item"
+              :class="{ clickable: bucket.key !== 'bucketNoDate' }"
+              @click="bucket.key !== 'bucketNoDate' && emit('click:due', bucket.key)"
+            >
               <div class="dist-header">
                 <span class="dist-name">{{ t(`stats.${bucket.key}`) }}</span>
                 <span class="dist-count" :class="bucket.toneClass">{{ bucket.count }}</span>
@@ -218,7 +267,12 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
         <div v-if="dashboardPriorityDist.length" class="dashboard-card priority-section" data-testid="stats-priority-section">
           <h3>{{ t('stats.priorityDist') }}</h3>
           <ul class="dist-list">
-            <li v-for="p in dashboardPriorityDist" :key="p.priority" class="dist-item">
+            <li
+              v-for="p in dashboardPriorityDist"
+              :key="p.priority"
+              class="dist-item clickable"
+              @click="emit('click:priority', p.priority)"
+            >
               <div class="dist-header">
                 <span class="dist-name">{{ p.labelKey.includes('.') ? t(p.labelKey) : t(`stats.${p.labelKey}`) }}</span>
                 <span class="dist-count" :class="p.toneClass">{{ p.count }}</span>
@@ -233,7 +287,12 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
         <div v-if="dashboardRecurrence.length" class="dashboard-card recurrence-section" data-testid="stats-recurrence-section">
           <h3>{{ t('stats.recurrenceDistribution') }}</h3>
           <ul class="dist-list">
-            <li v-for="item in dashboardRecurrence" :key="item.recurrenceType" class="dist-item">
+            <li
+              v-for="item in dashboardRecurrence"
+              :key="item.recurrenceType"
+              class="dist-item clickable"
+              @click="emit('click:recurrence', item.recurrenceType)"
+            >
               <div class="dist-header">
                 <span class="dist-name">{{ t(item.labelKey) }}</span>
                 <span class="dist-count">{{ item.count }}</span>
@@ -427,6 +486,40 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-sm, 4px);
+  transition: background-color 0.2s ease;
+}
+
+.dist-item.clickable {
+  cursor: pointer;
+}
+
+.dist-item.clickable:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.trend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.trend-header h3 {
+  margin: 0;
+}
+
+.trend-range-select {
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-bright, #fff);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-sm, 4px);
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  outline: none;
 }
 
 .dist-header {
@@ -561,5 +654,62 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
   font-style: italic;
   text-align: center;
   padding: 1rem 0;
+}
+
+.trend-chart-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  /* Add top padding to prevent tooltip clipping when bar is at 100% height */
+  padding-top: 32px;
+}
+
+.trend-chart-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.trend-chart-wrapper::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+.trend-chart-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+.trend-chart-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.trend-chart-wrapper .trend-chart-lg {
+  min-width: max-content; /* Ensure items do not shrink below their base size */
+}
+
+.trend-chart-wrapper .trend-day-lg {
+  flex: 1 0 auto; /* Prevent bars from squishing to 0 width */
+}
+
+/* 30 days */
+.trend-chart-wrapper.range-30d .trend-chart-lg {
+  gap: 8px;
+}
+.trend-chart-wrapper.range-30d .trend-day-lg {
+  min-width: 32px;
+}
+.trend-chart-wrapper.range-30d .bar-lg {
+  width: 14px;
+}
+
+/* 90 days */
+.trend-chart-wrapper.range-90d .trend-chart-lg {
+  gap: 4px;
+}
+.trend-chart-wrapper.range-90d .trend-day-lg {
+  min-width: 16px;
+}
+.trend-chart-wrapper.range-90d .bar-lg {
+  width: 6px;
+}
+.trend-chart-wrapper.range-90d .day-label-lg {
+  font-size: 0.65rem;
 }
 </style>

@@ -142,4 +142,110 @@ describe('TodoStatsPanel', () => {
     expect(rows[0]?.attributes('data-category-key')).toBe('Work')
     expect(rows[1]?.attributes('data-category-key')).toBe('__UNCLASSIFIED__')
   })
+
+  it('emits click events for due buckets, priority, and recurrence', async () => {
+    const wrapper = mountWithLocale('en', true)
+
+    await wrapper.findAll('.due-section .dist-item')[0].trigger('click')
+    expect(wrapper.emitted('click:due')).toBeTruthy()
+    expect(wrapper.emitted('click:due')![0]).toEqual(['bucketOverdue'])
+
+    await wrapper.findAll('.priority-section .dist-item')[0].trigger('click')
+    expect(wrapper.emitted('click:priority')).toBeTruthy()
+    expect(wrapper.emitted('click:priority')![0]).toEqual([5])
+
+    await wrapper.findAll('.recurrence-section .dist-item')[0].trigger('click')
+    expect(wrapper.emitted('click:recurrence')).toBeTruthy()
+    expect(wrapper.emitted('click:recurrence')![0]).toEqual(['DAILY'])
+  })
+
+  it('does not emit click for noDueDate bucket', async () => {
+    const wrapper = mountWithLocale('en', true)
+    
+    // Find the noDueDate bucket (the 5th one, index 4)
+    await wrapper.findAll('.due-section .dist-item')[4].trigger('click')
+    
+    // Ensure no new event was added, or at least the last event is not 'bucketNoDate'
+    const dueEvents = wrapper.emitted('click:due')
+    if (dueEvents) {
+      expect(dueEvents.some(e => e[0] === 'bucketNoDate')).toBe(false)
+    } else {
+      expect(dueEvents).toBeUndefined()
+    }
+  })
+
+  it('uses adaptive long-range trend wrapper classes and samples labels for 30d and 90d', async () => {
+    const wrapper = mount(TodoStatsPanel, {
+      props: {
+        overview: {
+          todayCompleted: 2,
+          weekCompleted: 7,
+          overdueCount: 3,
+          activeCount: 11,
+          upcomingReminderCount: 5,
+          unreadReminderCount: 4,
+        },
+        categories: [],
+        trend: Array.from({ length: 30 }, (_, index) => ({
+          date: `2026-04-${String(index + 1).padStart(2, '0')}`,
+          createdCount: 1,
+          completedCount: 1,
+        })),
+        trendSummary: {
+          totalCreated: 30,
+          totalCompleted: 30,
+          completionRate: 1,
+          netChange: 0,
+        },
+        dueBuckets: null,
+        priorityDistribution: null,
+        aging: null,
+        reminderSummary: null,
+        recurrenceDistribution: null,
+        pageMode: true,
+        trendRange: '30d',
+      },
+      global: {
+        plugins: [createI18n({
+          legacy: false,
+          locale: 'en',
+          messages: { en, 'zh-CN': zhCN },
+        })],
+      },
+    })
+
+    expect(wrapper.find('.trend-chart-wrapper').classes()).toContain('range-30d')
+    expect(wrapper.findAll('[data-testid="stats-trend-bar"]')).toHaveLength(30)
+    
+    // For 30d, interval is 5. With 30 items, index 29, 24, 19, 14, 9, 4 -> 6 labels
+    let labels = wrapper.findAll('.day-label-lg')
+    let visibleLabels = labels.filter(l => l.element.style.display !== 'none')
+    expect(visibleLabels.length).toBe(6)
+
+    const visibleLabelIndexes30d = labels
+      .map((label, index) => label.element.style.display !== 'none' ? index : -1)
+      .filter((index) => index >= 0)
+    expect(visibleLabelIndexes30d).toEqual([4, 9, 14, 19, 24, 29])
+    expect(labels[29]?.element.style.display).not.toBe('none')
+
+    await wrapper.setProps({ trendRange: '90d', trend: Array.from({ length: 90 }, (_, index) => ({
+      date: `2026-01-${String((index % 31) + 1).padStart(2, '0')}`,
+      createdCount: 1,
+      completedCount: 1,
+    })) })
+
+    expect(wrapper.find('.trend-chart-wrapper').classes()).toContain('range-90d')
+    expect(wrapper.findAll('[data-testid="stats-trend-bar"]')).toHaveLength(90)
+    
+    // For 90d, interval is 14. With 90 items, index 89, 75, 61, 47, 33, 19, 5 -> 7 labels
+    labels = wrapper.findAll('.day-label-lg')
+    visibleLabels = labels.filter(l => l.element.style.display !== 'none')
+    expect(visibleLabels.length).toBe(7)
+
+    const visibleLabelIndexes90d = labels
+      .map((label, index) => label.element.style.display !== 'none' ? index : -1)
+      .filter((index) => index >= 0)
+    expect(visibleLabelIndexes90d).toEqual([5, 19, 33, 47, 61, 75, 89])
+    expect(labels[89]?.element.style.display).not.toBe('none')
+  })
 })

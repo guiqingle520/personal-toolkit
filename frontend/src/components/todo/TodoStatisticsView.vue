@@ -41,14 +41,20 @@ const reminderSummary = ref<TodoReminderSummary | null>(null)
 const recurrenceDistribution = ref<TodoStatsRecurrenceDistribution | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
+const trendRange = ref('7d')
 
 function buildTasksQuery(payload: {
   viewMode?: TodoViewMode
   displayMode?: TodoDisplayMode
   showOptionsPanel?: boolean
+  overrides?: Partial<ReturnType<typeof createDefaultTodoFilters>>
 }) {
+  const filters = createDefaultTodoFilters()
+  if (payload.overrides) {
+    Object.assign(filters, payload.overrides)
+  }
   const queryString = serializeTodoUrlState({
-    filters: createDefaultTodoFilters(),
+    filters,
     viewMode: payload.viewMode ?? 'ACTIVE',
     displayMode: payload.displayMode ?? 'LIST',
   })
@@ -69,7 +75,7 @@ async function loadStats() {
     const [overviewRes, categoryRes, trendRes, dueBucketsRes, priorityDistRes, agingRes, reminderRes, recurrenceRes] = await Promise.all([
       fetchApi<TodoStatsOverview>('/api/todos/stats/overview'),
       fetchApi<TodoStatsCategoryItem[]>('/api/todos/stats/by-category'),
-      fetchApi<{ range: string; items: TodoStatsTrendItem[]; summary: TodoStatsTrendSummary }>('/api/todos/stats/trend?range=7d'),
+      fetchApi<{ range: string; items: TodoStatsTrendItem[]; summary: TodoStatsTrendSummary }>(`/api/todos/stats/trend?range=${trendRange.value}`),
       fetchApi<TodoStatsDueBuckets>('/api/todos/stats/due-buckets'),
       fetchApi<TodoStatsPriorityDistribution>('/api/todos/stats/priority-distribution'),
       fetchApi<TodoStatsAging>('/api/todos/stats/aging'),
@@ -121,6 +127,69 @@ function handleNavigateTasks(payload: {
     name: 'tasks',
     query: buildTasksQuery(payload),
   })
+}
+
+function handleDrillDown(overrides: Partial<ReturnType<typeof createDefaultTodoFilters>>) {
+  void router.push({
+    name: 'tasks',
+    query: buildTasksQuery({ overrides }),
+  })
+}
+
+function handleTrendRangeUpdate(range: string) {
+  trendRange.value = range
+  void loadStats()
+}
+
+function getLocalIsoDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function handleDueClick(bucketKey: string) {
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  if (bucketKey === 'bucketOverdue') {
+    const yesterday = new Date(startOfToday)
+    yesterday.setDate(startOfToday.getDate() - 1)
+    handleDrillDown({
+      status: 'PENDING',
+      dueDateTo: getLocalIsoDate(yesterday),
+    })
+  } else if (bucketKey === 'bucketToday') {
+    handleDrillDown({ status: 'PENDING', timePreset: 'DUE_TODAY' })
+  } else if (bucketKey === 'bucket3Days') {
+    const day1 = new Date(now)
+    day1.setDate(now.getDate() + 1)
+    const day3 = new Date(now)
+    day3.setDate(now.getDate() + 3)
+    handleDrillDown({
+      status: 'PENDING',
+      dueDateFrom: getLocalIsoDate(day1),
+      dueDateTo: getLocalIsoDate(day3),
+    })
+  } else if (bucketKey === 'bucket7Days') {
+    const day4 = new Date(now)
+    day4.setDate(now.getDate() + 4)
+    const day7 = new Date(now)
+    day7.setDate(now.getDate() + 7)
+    handleDrillDown({
+      status: 'PENDING',
+      dueDateFrom: getLocalIsoDate(day4),
+      dueDateTo: getLocalIsoDate(day7),
+    })
+  }
+}
+
+function handlePriorityClick(priority: number) {
+  handleDrillDown({ status: 'PENDING', priority: priority.toString() })
+}
+
+function handleRecurrenceClick(recurrenceType: string) {
+  handleDrillDown({ status: 'PENDING', recurrenceType })
 }
 
 onMounted(() => {
@@ -175,7 +244,12 @@ onMounted(() => {
         :aging="aging"
         :reminder-summary="reminderSummary"
         :recurrence-distribution="recurrenceDistribution"
+        :trend-range="trendRange"
         page-mode
+        @update:trend-range="handleTrendRangeUpdate"
+        @click:due="handleDueClick"
+        @click:priority="handlePriorityClick"
+        @click:recurrence="handleRecurrenceClick"
       />
     </div>
   </TodoWorkbenchLayout>

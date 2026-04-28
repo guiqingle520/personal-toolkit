@@ -68,7 +68,7 @@ public class TodoService {
     private static final Set<String> ALLOWED_STATUSES = Set.of("PENDING", "DONE");
     private static final Set<String> ALLOWED_RECURRENCE_TYPES = Set.of("NONE", "DAILY", "WEEKLY", "MONTHLY");
     private static final Set<String> ALLOWED_TIME_PRESETS = Set.of("DUE_TODAY", "OVERDUE", "UPCOMING_REMINDER");
-    private static final String SUPPORTED_TREND_RANGE = "7d";
+    private static final Set<String> SUPPORTED_TREND_RANGES = Set.of("7d", "30d", "90d");
     private static final String UNCLASSIFIED_CATEGORY_KEY = "__UNCLASSIFIED__";
 
     private final TodoRepository todoRepository;
@@ -339,19 +339,22 @@ public class TodoService {
     }
 
     /**
-     * 构建最近 7 天完成趋势，并为无数据日期补零，供前端趋势面板直接消费。
+     * 构建指定范围内的完成趋势，并为无数据日期补零，供前端趋势面板直接消费。
      *
-     * @param range 时间范围，目前仅支持 7d
-     * @return 最近 7 天趋势数据
+     * @param range 时间范围，目前支持 7d / 30d / 90d
+     * @return 对应范围的趋势数据
      */
     @Transactional(readOnly = true)
     public TodoStatsTrendResponse getStatsTrend(String range) {
-        if (!SUPPORTED_TREND_RANGE.equalsIgnoreCase(range)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "range must be 7d");
+        String normalizedRange = normalizeTrendRange(range);
+        int rangeDays = resolveTrendRangeDays(normalizedRange);
+
+        if (rangeDays <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "range must be one of: " + SUPPORTED_TREND_RANGES);
         }
 
         LocalDate today = LocalDate.now();
-        LocalDate startDate = today.minusDays(6);
+        LocalDate startDate = today.minusDays(rangeDays - 1L);
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = today.atTime(23, 59, 59);
         Map<LocalDate, Long> createdByDate = new HashMap<>();
@@ -370,7 +373,7 @@ public class TodoService {
         List<TodoStatsTrendItemResponse> items = new ArrayList<>();
         long totalCreated = 0L;
         long totalCompleted = 0L;
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < rangeDays; i++) {
             LocalDate currentDate = startDate.plusDays(i);
             long createdCount = createdByDate.getOrDefault(currentDate, 0L);
             long completedCount = completedByDate.getOrDefault(currentDate, 0L);
@@ -380,10 +383,26 @@ public class TodoService {
         }
 
         return new TodoStatsTrendResponse(
-                SUPPORTED_TREND_RANGE,
+                normalizedRange,
                 items,
                 buildTrendSummary(totalCreated, totalCompleted)
         );
+    }
+
+    private String normalizeTrendRange(String range) {
+        if (!hasText(range)) {
+            return "7d";
+        }
+
+        return range.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private int resolveTrendRangeDays(String normalizedRange) {
+        if (!SUPPORTED_TREND_RANGES.contains(normalizedRange)) {
+            return -1;
+        }
+
+        return Integer.parseInt(normalizedRange.substring(0, normalizedRange.length() - 1));
     }
 
     private TodoStatsTrendSummaryResponse buildTrendSummary(long totalCreated, long totalCompleted) {
@@ -1060,7 +1079,15 @@ public class TodoService {
             }
 
             if (normalizedRecurrenceTypeFilter != null) {
-                predicates.add(criteriaBuilder.equal(root.get("recurrenceType"), normalizedRecurrenceTypeFilter));
+                if ("NONE".equals(normalizedRecurrenceTypeFilter)) {
+                    predicates.add(criteriaBuilder.or(
+                            criteriaBuilder.equal(root.get("recurrenceType"), "NONE"),
+                            criteriaBuilder.isNull(root.get("recurrenceType")),
+                            criteriaBuilder.equal(criteriaBuilder.trim(root.get("recurrenceType")), "")
+                    ));
+                } else {
+                    predicates.add(criteriaBuilder.equal(root.get("recurrenceType"), normalizedRecurrenceTypeFilter));
+                }
             }
 
             if (queryRequest.getDueDateFrom() != null) {

@@ -458,11 +458,66 @@ class TodoServiceTest {
     }
 
     /**
+     * 趋势统计应支持最近 30 天范围，并按请求范围补齐日期。
+     */
+    @Test
+    void getStatsTrendShouldSupport30dRange() {
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusDays(29);
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = today.atTime(23, 59, 59);
+        when(todoRepository.findCreatedAtBetween(USER_ID, start, end)).thenReturn(List.of(
+                startDate.atTime(9, 0),
+                today.atTime(10, 0)
+        ));
+        when(todoRepository.findCompletedAtBetween(USER_ID, start, end)).thenReturn(List.of(
+                startDate.plusDays(1).atTime(12, 0),
+                today.atTime(13, 0)
+        ));
+
+        TodoStatsTrendResponse response = todoService.getStatsTrend("30d");
+
+        assertEquals("30d", response.getRange());
+        assertEquals(30, response.getItems().size());
+        assertEquals(startDate.toString(), response.getItems().get(0).getDate());
+        assertEquals(today.toString(), response.getItems().get(29).getDate());
+        assertEquals(2L, response.getSummary().getTotalCreated());
+        assertEquals(2L, response.getSummary().getTotalCompleted());
+    }
+
+    /**
+     * 趋势统计应支持最近 90 天范围，并保留同样的汇总结构。
+     */
+    @Test
+    void getStatsTrendShouldSupport90dRange() {
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusDays(89);
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = today.atTime(23, 59, 59);
+        when(todoRepository.findCreatedAtBetween(USER_ID, start, end)).thenReturn(List.of(
+                startDate.atTime(9, 0)
+        ));
+        when(todoRepository.findCompletedAtBetween(USER_ID, start, end)).thenReturn(List.of(
+                today.atTime(13, 0)
+        ));
+
+        TodoStatsTrendResponse response = todoService.getStatsTrend("90d");
+
+        assertEquals("90d", response.getRange());
+        assertEquals(90, response.getItems().size());
+        assertEquals(startDate.toString(), response.getItems().get(0).getDate());
+        assertEquals(today.toString(), response.getItems().get(89).getDate());
+        assertEquals(1L, response.getSummary().getTotalCreated());
+        assertEquals(1L, response.getSummary().getTotalCompleted());
+        assertEquals("1", response.getSummary().getCompletionRate().toPlainString());
+    }
+
+    /**
      * 非法趋势范围应继续返回 400，避免不支持的时间范围进入统计逻辑。
      */
     @Test
     void getStatsTrendShouldRejectUnsupportedRange() {
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> todoService.getStatsTrend("30d"));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> todoService.getStatsTrend("14d"));
 
         assertEquals(400, exception.getStatusCode().value());
     }

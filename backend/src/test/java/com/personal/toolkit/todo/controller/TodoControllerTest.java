@@ -257,6 +257,46 @@ class TodoControllerTest {
     }
 
     /**
+     * 趋势统计接口应支持 30 天范围参数透传。
+     */
+    @Test
+    void getStatsTrendShouldReturn30dTrendPayload() throws Exception {
+        when(todoService.getStatsTrend("30d")).thenReturn(new TodoStatsTrendResponse(
+                "30d",
+                List.of(
+                        new TodoStatsTrendItemResponse("2026-03-07", 2, 1),
+                        new TodoStatsTrendItemResponse("2026-04-05", 1, 0)
+                ),
+                new TodoStatsTrendSummaryResponse(3, 1, new BigDecimal("0.3333"), 2)
+        ));
+
+        mockMvc.perform(get("/api/todos/stats/trend").param("range", "30d"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.range").value("30d"))
+                .andExpect(jsonPath("$.data.items[0].date").value("2026-03-07"));
+    }
+
+    /**
+     * 趋势统计接口应支持 90 天范围参数透传。
+     */
+    @Test
+    void getStatsTrendShouldReturn90dTrendPayload() throws Exception {
+        when(todoService.getStatsTrend("90d")).thenReturn(new TodoStatsTrendResponse(
+                "90d",
+                List.of(
+                        new TodoStatsTrendItemResponse("2026-01-07", 1, 0),
+                        new TodoStatsTrendItemResponse("2026-04-05", 0, 1)
+                ),
+                new TodoStatsTrendSummaryResponse(1, 1, new BigDecimal("1"), 0)
+        ));
+
+        mockMvc.perform(get("/api/todos/stats/trend").param("range", "90d"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.range").value("90d"))
+                .andExpect(jsonPath("$.data.summary.totalCompleted").value(1));
+    }
+
+    /**
      * 活动列表查询接口应返回前端依赖的统一分页响应结构。
      */
     @Test

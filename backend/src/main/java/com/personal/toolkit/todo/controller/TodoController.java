@@ -147,7 +147,7 @@ public class TodoController {
     }
 
     /**
-     * 查询统计面板中的完成趋势数据，目前仅支持最近 7 天范围。
+     * 查询统计面板中的完成趋势数据，目前支持 7d、30d 与 90d 范围。
      *
      * @param range 趋势范围标识
      * @return 趋势统计统一响应体

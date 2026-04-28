@@ -281,4 +281,59 @@ describe('TodoStatisticsView', () => {
     expect(wrapper.text()).not.toContain('0.6667')
     expect(wrapper.text()).toContain('None')
   })
+
+  it('updates trend range and refetches stats', async () => {
+    const { wrapper } = await mountStatisticsView()
+    const beforeCount = fetchMock.mock.calls.length
+
+    const select = wrapper.find('select.trend-range-select')
+    await select.setValue('30d')
+    await select.trigger('change')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos/stats/trend?range=30d',
+      expect.any(Object)
+    )
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(beforeCount)
+  })
+
+  it('navigates to tasks page with filters when drill-down is clicked', async () => {
+    const { wrapper, router } = await mountStatisticsView()
+
+    // Mock priority click
+    const priorityItem = wrapper.findAll('.priority-section .dist-item')[0]
+    await priorityItem.trigger('click')
+    await flushPromises()
+
+    // It should navigate to /tasks?priority=5
+    expect(router.currentRoute.value.fullPath).toContain('/tasks')
+    expect(router.currentRoute.value.fullPath).toContain('status=PENDING')
+    expect(router.currentRoute.value.fullPath).toContain('priority=5')
+  })
+
+  it('uses date-range overdue drill-down semantics instead of the realtime overdue preset', async () => {
+    const { wrapper, router } = await mountStatisticsView()
+
+    const dueItem = wrapper.findAll('.due-section .dist-item')[0]
+    await dueItem.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toContain('/tasks')
+    expect(router.currentRoute.value.fullPath).toContain('status=PENDING')
+    expect(router.currentRoute.value.fullPath).toContain('dueDateTo=')
+    expect(router.currentRoute.value.fullPath).not.toContain('timePreset=OVERDUE')
+  })
+
+  it('navigates recurrence drill-down with active-task scope', async () => {
+    const { wrapper, router } = await mountStatisticsView()
+
+    const recurrenceItem = wrapper.findAll('.recurrence-section .dist-item')[0]
+    await recurrenceItem.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toContain('/tasks')
+    expect(router.currentRoute.value.fullPath).toContain('status=PENDING')
+    expect(router.currentRoute.value.fullPath).toContain('recurrenceType=DAILY')
+  })
 })
