@@ -22,9 +22,32 @@ function mountWithLocale(locale: 'en' | 'zh-CN' = 'en', pageMode = false) {
         { category: '__UNCLASSIFIED__', activeCount: 3, completedCount: 1 },
       ],
       trend: [
-        { date: '2026-04-01', completedCount: 1 },
-        { date: '2026-04-02', completedCount: 2 },
+        { date: '2026-04-01', createdCount: 2, completedCount: 1 },
+        { date: '2026-04-02', createdCount: 1, completedCount: 2 },
       ],
+      trendSummary: {
+        totalCreated: 3,
+        totalCompleted: 3,
+        completionRate: 1.0,
+        netChange: 0,
+      },
+      dueBuckets: {
+        overdue: 1,
+        dueToday: 2,
+        dueIn3Days: 3,
+        dueIn7Days: 4,
+        noDueDate: 1,
+        totalActive: 11,
+      },
+      priorityDistribution: {
+        items: [
+          { priority: 5, count: 2 },
+          { priority: 4, count: 3 },
+          { priority: 3, count: 1 },
+          { priority: 1, count: 5 },
+        ],
+        totalActive: 11,
+      },
       pageMode,
     },
     global: {
@@ -75,6 +98,14 @@ describe('TodoStatsPanel', () => {
     expect(wrapper.findAll('[data-testid="stats-trend-bar"]')).toHaveLength(2)
     expect(wrapper.find('[data-testid="stats-trend-snapshot"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="stats-categories-section"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stats-due-section"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stats-priority-section"]').exists()).toBe(true)
+    
+    // Check trend snapshot specific text for English
+    expect(wrapper.text()).toContain('Created in shown trend')
+    expect(wrapper.text()).toContain('Net change')
+    expect(wrapper.text()).toContain('Priority Distribution')
+    expect(wrapper.text()).toContain('Due Timeline')
   })
 
   it('sorts category rows deterministically in page mode', () => {

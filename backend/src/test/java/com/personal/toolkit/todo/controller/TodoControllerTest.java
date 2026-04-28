@@ -12,9 +12,13 @@ import com.personal.toolkit.todo.dto.TodoBatchRequest;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
+import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendSummaryResponse;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.todo.service.TodoService;
@@ -33,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -143,6 +148,47 @@ class TodoControllerTest {
     }
 
     /**
+     * 截止时间桶统计接口应返回固定分桶字段。
+     */
+    @Test
+    void getDueBucketsStatsShouldReturnDueBucketsPayload() throws Exception {
+        when(todoService.getDueBucketsStats()).thenReturn(new TodoStatsDueBucketsResponse(3, 4, 5, 6, 2, 20));
+
+        mockMvc.perform(get("/api/todos/stats/due-buckets"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Todo due bucket stats fetched successfully"))
+                .andExpect(jsonPath("$.data.overdue").value(3))
+                .andExpect(jsonPath("$.data.dueToday").value(4))
+                .andExpect(jsonPath("$.data.dueIn3Days").value(5))
+                .andExpect(jsonPath("$.data.dueIn7Days").value(6))
+                .andExpect(jsonPath("$.data.noDueDate").value(2))
+                .andExpect(jsonPath("$.data.totalActive").value(20));
+    }
+
+    /**
+     * 优先级分布接口应返回列表与总活动任务数。
+     */
+    @Test
+    void getPriorityDistributionStatsShouldReturnPriorityPayload() throws Exception {
+        when(todoService.getPriorityDistributionStats()).thenReturn(new TodoStatsPriorityDistributionResponse(
+                List.of(
+                        new TodoStatsPriorityDistributionItemResponse(1, 2),
+                        new TodoStatsPriorityDistributionItemResponse(3, 7)
+                ),
+                9
+        ));
+
+        mockMvc.perform(get("/api/todos/stats/priority-distribution"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Todo priority distribution fetched successfully"))
+                .andExpect(jsonPath("$.data.items[0].priority").value(1))
+                .andExpect(jsonPath("$.data.items[0].count").value(2))
+                .andExpect(jsonPath("$.data.totalActive").value(9));
+    }
+
+    /**
      * 趋势统计接口应返回时间范围与每日完成数量列表。
      */
     @Test
@@ -150,9 +196,10 @@ class TodoControllerTest {
         when(todoService.getStatsTrend("7d")).thenReturn(new TodoStatsTrendResponse(
                 "7d",
                 List.of(
-                        new TodoStatsTrendItemResponse("2026-04-04", 1),
-                        new TodoStatsTrendItemResponse("2026-04-05", 0)
-                )
+                        new TodoStatsTrendItemResponse("2026-04-04", 2, 1),
+                        new TodoStatsTrendItemResponse("2026-04-05", 1, 0)
+                ),
+                new TodoStatsTrendSummaryResponse(3, 1, new BigDecimal("0.3333"), 2)
         ));
 
         mockMvc.perform(get("/api/todos/stats/trend").param("range", "7d"))
@@ -161,7 +208,12 @@ class TodoControllerTest {
                 .andExpect(jsonPath("$.message").value("Todo stats trend fetched successfully"))
                 .andExpect(jsonPath("$.data.range").value("7d"))
                 .andExpect(jsonPath("$.data.items[0].date").value("2026-04-04"))
-                .andExpect(jsonPath("$.data.items[0].completedCount").value(1));
+                .andExpect(jsonPath("$.data.items[0].createdCount").value(2))
+                .andExpect(jsonPath("$.data.items[0].completedCount").value(1))
+                .andExpect(jsonPath("$.data.summary.totalCreated").value(3))
+                .andExpect(jsonPath("$.data.summary.totalCompleted").value(1))
+                .andExpect(jsonPath("$.data.summary.completionRate").value(0.3333))
+                .andExpect(jsonPath("$.data.summary.netChange").value(2));
     }
 
     /**

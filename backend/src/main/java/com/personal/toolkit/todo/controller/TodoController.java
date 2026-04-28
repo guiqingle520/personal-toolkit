@@ -7,7 +7,9 @@ import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
 import com.personal.toolkit.todo.dto.TodoQueryRequest;
 import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
+import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.todo.service.TodoService;
@@ -94,6 +96,29 @@ public class TodoController {
     @GetMapping("/stats/by-category")
     public ResponseEntity<ApiResponse<List<TodoStatsCategoryItemResponse>>> getStatsByCategory() {
         return ResponseEntity.ok(ApiResponse.success("Todo stats by category fetched successfully", todoService.getCategoryStats()));
+    }
+
+    /**
+     * 查询活动任务在固定截止时间桶中的分布情况。
+     *
+     * @return 截止时间桶统计统一响应体
+     */
+    @GetMapping("/stats/due-buckets")
+    public ResponseEntity<ApiResponse<TodoStatsDueBucketsResponse>> getDueBucketsStats() {
+        return ResponseEntity.ok(ApiResponse.success("Todo due bucket stats fetched successfully", todoService.getDueBucketsStats()));
+    }
+
+    /**
+     * 查询活动任务按优先级聚合后的分布结果。
+     *
+     * @return 优先级分布统计统一响应体
+     */
+    @GetMapping("/stats/priority-distribution")
+    public ResponseEntity<ApiResponse<TodoStatsPriorityDistributionResponse>> getPriorityDistributionStats() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Todo priority distribution fetched successfully",
+                todoService.getPriorityDistributionStats()
+        ));
     }
 
     /**

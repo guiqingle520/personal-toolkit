@@ -9,10 +9,18 @@ public class TodoStatsTrendResponse {
 
     private final String range;
     private final List<TodoStatsTrendItemResponse> items;
+    private final TodoStatsTrendSummaryResponse summary;
 
     public TodoStatsTrendResponse(String range, List<TodoStatsTrendItemResponse> items) {
+        this(range, items, null);
+    }
+
+    public TodoStatsTrendResponse(String range,
+                                  List<TodoStatsTrendItemResponse> items,
+                                  TodoStatsTrendSummaryResponse summary) {
         this.range = range;
         this.items = items;
+        this.summary = summary;
     }
 
     /**
@@ -31,5 +39,14 @@ public class TodoStatsTrendResponse {
      */
     public List<TodoStatsTrendItemResponse> getItems() {
         return items;
+    }
+
+    /**
+     * 返回趋势统计的汇总指标。
+     *
+     * @return 趋势汇总信息
+     */
+    public TodoStatsTrendSummaryResponse getSummary() {
+        return summary;
     }
 }

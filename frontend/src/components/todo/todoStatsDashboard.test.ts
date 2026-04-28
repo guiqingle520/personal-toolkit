@@ -5,6 +5,8 @@ import {
   buildDashboardKpis,
   buildDashboardSnapshot,
   buildDashboardTrend,
+  buildDashboardDueBuckets,
+  buildDashboardPriorities,
 } from './todoStatsDashboard'
 
 describe('todoStatsDashboard', () => {
@@ -25,9 +27,9 @@ describe('todoStatsDashboard', () => {
 
   it('sorts trend data chronologically and marks peak day', () => {
     const trend = buildDashboardTrend([
-      { date: '2026-04-03', completedCount: 1 },
-      { date: '2026-04-01', completedCount: 2 },
-      { date: '2026-04-02', completedCount: 0 },
+      { date: '2026-04-03', createdCount: 2, completedCount: 1 },
+      { date: '2026-04-01', createdCount: 3, completedCount: 2 },
+      { date: '2026-04-02', createdCount: 1, completedCount: 0 },
     ], (date) => date.slice(5))
 
     expect(trend.map((item) => item.date)).toEqual(['2026-04-01', '2026-04-02', '2026-04-03'])
@@ -37,17 +39,38 @@ describe('todoStatsDashboard', () => {
 
   it('builds snapshot metrics from shown trend data', () => {
     const snapshot = buildDashboardSnapshot([
-      { date: '2026-04-01', label: '04-01', completedCount: 2, isPeak: false },
-      { date: '2026-04-02', label: '04-02', completedCount: 0, isPeak: false },
-      { date: '2026-04-03', label: '04-03', completedCount: 4, isPeak: true },
+      { date: '2026-04-01', label: '04-01', createdCount: 3, completedCount: 2, isPeak: false },
+      { date: '2026-04-02', label: '04-02', createdCount: 1, completedCount: 0, isPeak: false },
+      { date: '2026-04-03', label: '04-03', createdCount: 2, completedCount: 4, isPeak: true },
     ])
 
     expect(snapshot).toMatchObject({
+      totalCreated: 6,
       totalCompleted: 6,
+      netChange: 0,
+      completionRate: 100,
       averagePerShownDay: 2,
       activeDays: 2,
       peakCompletedCount: 4,
       peakDate: '04-03',
+    })
+  })
+
+  it('builds snapshot metrics using trend summary when provided', () => {
+    const snapshot = buildDashboardSnapshot([
+      { date: '2026-04-01', label: '04-01', createdCount: 1, completedCount: 1, isPeak: false },
+    ], {
+      totalCreated: 10,
+      totalCompleted: 5,
+      netChange: 5,
+      completionRate: 0.5,
+    })
+
+    expect(snapshot).toMatchObject({
+      totalCreated: 10,
+      totalCompleted: 5,
+      netChange: 5,
+      completionRate: 50,
     })
   })
 
@@ -65,7 +88,10 @@ describe('todoStatsDashboard', () => {
 
   it('handles empty trend and category collections safely', () => {
     expect(buildDashboardSnapshot([])).toMatchObject({
+      totalCreated: 0,
       totalCompleted: 0,
+      netChange: 0,
+      completionRate: 0,
       averagePerShownDay: 0,
       activeDays: 0,
       peakDate: '',
@@ -73,5 +99,34 @@ describe('todoStatsDashboard', () => {
     })
 
     expect(buildDashboardCategories([], (category) => category)).toEqual([])
+  })
+
+  it('builds dashboard due buckets correctly', () => {
+    const buckets = buildDashboardDueBuckets({
+      overdue: 2,
+      dueToday: 1,
+      dueIn3Days: 3,
+      dueIn7Days: 4,
+      noDueDate: 0,
+      totalActive: 10,
+    })
+
+    expect(buckets).toHaveLength(5)
+    expect(buckets[0]).toMatchObject({ key: 'bucketOverdue', count: 2, percentage: 20 })
+  })
+
+  it('builds dashboard priority distribution correctly', () => {
+    const distribution = buildDashboardPriorities({
+      items: [
+        { priority: 5, count: 2 },
+        { priority: 0, count: 8 },
+        { priority: 10, count: 1 },
+      ],
+      totalActive: 11,
+    })
+
+    expect(distribution).toHaveLength(5)
+    expect(distribution[0]).toMatchObject({ priority: 5, labelKey: 'priority.critical', count: 3, percentage: 27 })
+    expect(distribution[4]).toMatchObject({ priority: 1, labelKey: 'priority.backlog', count: 8, percentage: 73 })
   })
 })

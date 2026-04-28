@@ -15,7 +15,14 @@ import TodoWorkbenchLayout from './TodoWorkbenchLayout.vue'
 import TodoWorkbenchHeader from './TodoWorkbenchHeader.vue'
 import TodoSidebarNav from './TodoSidebarNav.vue'
 import TodoStatsPanel from './TodoStatsPanel.vue'
-import type { TodoStatsOverview, TodoStatsCategoryItem, TodoStatsTrendItem } from './types'
+import type { 
+  TodoStatsOverview, 
+  TodoStatsCategoryItem, 
+  TodoStatsTrendItem,
+  TodoStatsTrendSummary,
+  TodoStatsDueBuckets,
+  TodoStatsPriorityDistribution
+} from './types'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -23,6 +30,9 @@ const { t } = useI18n()
 const overview = ref<TodoStatsOverview | null>(null)
 const categories = ref<TodoStatsCategoryItem[]>([])
 const trend = ref<TodoStatsTrendItem[]>([])
+const trendSummary = ref<TodoStatsTrendSummary | undefined>(undefined)
+const dueBuckets = ref<TodoStatsDueBuckets | null>(null)
+const priorityDistribution = ref<TodoStatsPriorityDistribution | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 
@@ -50,19 +60,27 @@ async function loadStats() {
   errorMessage.value = ''
 
   try {
-    const [overviewRes, categoryRes, trendRes] = await Promise.all([
+    const [overviewRes, categoryRes, trendRes, dueBucketsRes, priorityDistRes] = await Promise.all([
       fetchApi<TodoStatsOverview>('/api/todos/stats/overview'),
       fetchApi<TodoStatsCategoryItem[]>('/api/todos/stats/by-category'),
-      fetchApi<{ range: string; items: TodoStatsTrendItem[] }>('/api/todos/stats/trend?range=7d'),
+      fetchApi<{ range: string; items: TodoStatsTrendItem[]; summary: TodoStatsTrendSummary }>('/api/todos/stats/trend?range=7d'),
+      fetchApi<TodoStatsDueBuckets>('/api/todos/stats/due-buckets'),
+      fetchApi<TodoStatsPriorityDistribution>('/api/todos/stats/priority-distribution'),
     ])
 
     overview.value = overviewRes.data || null
     categories.value = categoryRes.data || []
     trend.value = trendRes.data?.items || []
+    trendSummary.value = trendRes.data?.summary
+    dueBuckets.value = dueBucketsRes.data || null
+    priorityDistribution.value = priorityDistRes.data || null
   } catch (error) {
     overview.value = null
     categories.value = []
     trend.value = []
+    trendSummary.value = undefined
+    dueBuckets.value = null
+    priorityDistribution.value = null
     errorMessage.value = error instanceof Error ? error.message : t('feedback.unexpectedError')
   } finally {
     loading.value = false
@@ -136,6 +154,9 @@ onMounted(() => {
         :overview="overview"
         :categories="categories"
         :trend="trend"
+        :trend-summary="trendSummary"
+        :due-buckets="dueBuckets"
+        :priority-distribution="priorityDistribution"
         page-mode
       />
     </div>

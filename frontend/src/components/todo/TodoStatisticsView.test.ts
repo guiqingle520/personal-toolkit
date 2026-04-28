@@ -55,13 +55,30 @@ describe('TodoStatisticsView', () => {
           { category: '__UNCLASSIFIED__', activeCount: 1, completedCount: 3 },
         ]) }
       }
+      if (url.includes('/api/todos/stats/due-buckets')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          overdue: 1, dueToday: 2, dueIn3Days: 0, dueIn7Days: 0, noDueDate: 1, totalActive: 4
+        }) }
+      }
+      if (url.includes('/api/todos/stats/priority-distribution')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          items: [{ priority: 5, count: 2 }, { priority: 2, count: 2 }],
+          totalActive: 4
+        }) }
+      }
 
       return { ok: true, json: async () => createSuccessResponse({
         range: '7d',
         items: [
-          { date: '2026-04-01', completedCount: 1 },
-          { date: '2026-04-02', completedCount: 2 },
+          { date: '2026-04-01', createdCount: 1, completedCount: 1 },
+          { date: '2026-04-02', createdCount: 0, completedCount: 2 },
         ],
+        summary: {
+          totalCreated: 1,
+          totalCompleted: 3,
+          netChange: -2,
+          completionRate: 0.85,
+        }
       }) }
     })
   })
@@ -97,6 +114,22 @@ describe('TodoStatisticsView', () => {
     )
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/todos/stats/trend?range=7d',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos/stats/due-buckets',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos/stats/priority-distribution',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',

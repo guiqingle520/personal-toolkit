@@ -39,6 +39,13 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long>, JpaSpecif
 
     long countByUserIdAndDeletedAtIsNullAndStatusNot(Long userId, String status);
 
+    long countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(Long userId,
+                                                                      String status,
+                                                                      LocalDateTime dueDateStart,
+                                                                      LocalDateTime dueDateEnd);
+
+    long countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateIsNull(Long userId, String status);
+
     long countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(Long userId, String status, LocalDateTime dueDate);
 
     long countByUserIdAndDeletedAtIsNullAndStatusNotAndRemindAtBetween(Long userId,
@@ -68,4 +75,27 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long>, JpaSpecif
     List<LocalDateTime> findCompletedAtBetween(@Param("userId") Long userId,
                                                @Param("start") LocalDateTime start,
                                                @Param("end") LocalDateTime end);
+
+    @Query("""
+             select t.createTime
+             from TodoItem t
+             where t.user.id = :userId
+               and t.deletedAt is null
+               and t.createTime between :start and :end
+             """)
+    List<LocalDateTime> findCreatedAtBetween(@Param("userId") Long userId,
+                                             @Param("start") LocalDateTime start,
+                                             @Param("end") LocalDateTime end);
+
+    @Query("""
+             select t.priority,
+                    count(t)
+             from TodoItem t
+             where t.user.id = :userId
+               and t.deletedAt is null
+               and t.status <> 'DONE'
+             group by t.priority
+             order by t.priority asc
+             """)
+    List<Object[]> summarizeActiveByPriority(@Param("userId") Long userId);
 }

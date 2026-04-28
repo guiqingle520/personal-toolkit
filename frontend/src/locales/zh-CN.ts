@@ -194,12 +194,22 @@ const zhCN = {
     empty: '暂无数据',
     snapshotTitle: '完成快照',
     trendTotalCompleted: '已展示趋势完成总数',
+    trendTotalCreated: '已展示趋势新建总数',
+    trendNetChange: '净增减',
     averagePerShownDay: '展示日均完成',
     activeDays: '有完成的天数',
     peakDay: '峰值日期',
     totalTasks: '共 {count} 项',
     completionRate: '完成率：{rate}%',
-    shareOfTrackedTotal: '占已跟踪总量 {share}%'
+    shareOfTrackedTotal: '占已跟踪总量 {share}%',
+    dueBuckets: '到期分布',
+    bucketOverdue: '已逾期',
+    bucketToday: '今日到期',
+    bucket3Days: '3日内到期',
+    bucket7Days: '7日内到期',
+    bucketNoDate: '无到期日',
+    priorityDist: '优先级分布',
+    createdOnlyLabel: '新建：{count}'
   },
   kanban: {
     pendingColumn: '待办',

@@ -1,4 +1,11 @@
-import type { TodoStatsCategoryItem, TodoStatsOverview, TodoStatsTrendItem } from './types'
+import type { 
+  TodoStatsCategoryItem, 
+  TodoStatsOverview, 
+  TodoStatsTrendItem,
+  TodoStatsTrendSummary,
+  TodoStatsDueBuckets,
+  TodoStatsPriorityDistribution
+} from './types'
 
 export type DashboardKpiKey =
   | 'todayCompleted'
@@ -17,13 +24,17 @@ export type DashboardKpiItem = {
 
 export type DashboardTrendItem = {
   date: string
+  createdCount: number
   completedCount: number
   label: string
   isPeak: boolean
 }
 
 export type DashboardSnapshot = {
+  totalCreated: number
   totalCompleted: number
+  netChange: number
+  completionRate: number
   averagePerShownDay: number
   activeDays: number
   peakDate: string
@@ -38,6 +49,21 @@ export type DashboardCategoryItem = {
   totalCount: number
   completionRate: number
   shareOfTotal: number
+}
+
+export type DashboardDueBucketItem = {
+  key: string
+  count: number
+  percentage: number
+  toneClass: string
+}
+
+export type DashboardPriorityItem = {
+  priority: number
+  labelKey: string
+  count: number
+  percentage: number
+  toneClass: string
 }
 
 export function buildDashboardKpis(overview: TodoStatsOverview): DashboardKpiItem[] {
@@ -60,14 +86,22 @@ export function buildDashboardTrend(
 
   return sortedTrend.map((item) => ({
     date: item.date,
+    createdCount: item.createdCount ?? 0,
     completedCount: item.completedCount,
     label: formatLabel(item.date),
     isPeak: peakCompletedCount > 0 && item.completedCount === peakCompletedCount,
   }))
 }
 
-export function buildDashboardSnapshot(trend: DashboardTrendItem[]): DashboardSnapshot {
-  const totalCompleted = trend.reduce((sum, item) => sum + item.completedCount, 0)
+export function buildDashboardSnapshot(
+  trend: DashboardTrendItem[],
+  summary?: TodoStatsTrendSummary
+): DashboardSnapshot {
+  const totalCompleted = summary ? summary.totalCompleted : trend.reduce((sum, item) => sum + item.completedCount, 0)
+  const totalCreated = summary ? summary.totalCreated : trend.reduce((sum, item) => sum + item.createdCount, 0)
+  const netChange = summary ? summary.netChange : totalCreated - totalCompleted
+  const completionRate = summary ? Math.round(summary.completionRate * 100) : (totalCreated > 0 ? Math.round((totalCompleted / totalCreated) * 100) : 0)
+
   const activeDays = trend.filter((item) => item.completedCount > 0).length
   const peakItem = trend.reduce<DashboardTrendItem | null>((currentPeak, item) => {
     if (!currentPeak || item.completedCount >= currentPeak.completedCount) {
@@ -78,7 +112,10 @@ export function buildDashboardSnapshot(trend: DashboardTrendItem[]): DashboardSn
   }, null)
 
   return {
+    totalCreated,
     totalCompleted,
+    netChange,
+    completionRate,
     averagePerShownDay: trend.length ? Number((totalCompleted / trend.length).toFixed(1)) : 0,
     activeDays,
     peakDate: peakItem?.label || '',
@@ -120,4 +157,53 @@ export function buildDashboardCategories(
 
       return left.displayName.localeCompare(right.displayName)
     })
+}
+
+export function buildDashboardDueBuckets(buckets: TodoStatsDueBuckets): DashboardDueBucketItem[] {
+  const total = buckets.totalActive || 1
+  return [
+    { key: 'bucketOverdue', count: buckets.overdue, percentage: Math.round((buckets.overdue / total) * 100), toneClass: 'text-warning' },
+    { key: 'bucketToday', count: buckets.dueToday, percentage: Math.round((buckets.dueToday / total) * 100), toneClass: 'text-primary' },
+    { key: 'bucket3Days', count: buckets.dueIn3Days, percentage: Math.round((buckets.dueIn3Days / total) * 100), toneClass: 'text-info' },
+    { key: 'bucket7Days', count: buckets.dueIn7Days, percentage: Math.round((buckets.dueIn7Days / total) * 100), toneClass: 'text-info' },
+    { key: 'bucketNoDate', count: buckets.noDueDate, percentage: Math.round((buckets.noDueDate / total) * 100), toneClass: 'text-muted' },
+  ]
+}
+
+export function buildDashboardPriorities(distribution: TodoStatsPriorityDistribution): DashboardPriorityItem[] {
+  const total = distribution.totalActive || 1
+  const countMap = new Map(distribution.items.map((item) => [item.priority, item.count]))
+
+  let criticalCount = 0
+  let backlogCount = 0
+  
+  for (const [p, c] of countMap.entries()) {
+    if (p === null || p === undefined || p < 2) {
+      backlogCount += c
+    } else if (p >= 5) {
+      criticalCount += c
+    }
+  }
+
+  const getConfig = (priority: number) => {
+    switch (priority) {
+      case 5: return { labelKey: 'priority.critical', toneClass: 'text-warning' } // Reusing existing classes
+      case 4: return { labelKey: 'priority.high', toneClass: 'text-warning' }
+      case 3: return { labelKey: 'priority.medium', toneClass: 'text-primary' }
+      case 2: return { labelKey: 'priority.low', toneClass: 'text-info' }
+      default: return { labelKey: 'priority.backlog', toneClass: 'text-muted' }
+    }
+  }
+
+  return [5, 4, 3, 2, 1].map((priority) => {
+    const count = priority === 1 ? backlogCount : (priority === 5 ? criticalCount : (countMap.get(priority) || 0))
+    const { labelKey, toneClass } = getConfig(priority)
+    return {
+      priority,
+      labelKey,
+      count,
+      percentage: Math.round((count / total) * 100),
+      toneClass,
+    }
+  })
 }

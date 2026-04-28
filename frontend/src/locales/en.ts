@@ -194,12 +194,22 @@ const en = {
     empty: 'No stats available',
     snapshotTitle: 'Completion Snapshot',
     trendTotalCompleted: 'Completed in shown trend',
+    trendTotalCreated: 'Created in shown trend',
+    trendNetChange: 'Net change',
     averagePerShownDay: 'Average per shown day',
     activeDays: 'Days with completions',
     peakDay: 'Peak day',
     totalTasks: '{count} tasks',
     completionRate: 'Completion rate: {rate}%',
-    shareOfTrackedTotal: '{share}% of tracked total'
+    shareOfTrackedTotal: '{share}% of tracked total',
+    dueBuckets: 'Due Timeline',
+    bucketOverdue: 'Overdue',
+    bucketToday: 'Today',
+    bucket3Days: 'Next 3 Days',
+    bucket7Days: 'Next 7 Days',
+    bucketNoDate: 'No Due Date',
+    priorityDist: 'Priority Distribution',
+    createdOnlyLabel: 'Created: {count}'
   },
   kanban: {
     pendingColumn: 'Pending',

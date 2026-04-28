@@ -8,9 +8,13 @@ import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
+import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendSummaryResponse;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.auth.repository.AppUserRepository;
@@ -36,6 +40,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.DayOfWeek;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -185,6 +191,52 @@ public class TodoService {
     }
 
     /**
+     * 聚合活动任务在固定截止时间桶中的分布情况，供统计页评估到期压力。
+     *
+     * @return 截止时间桶统计结果
+     */
+    @Transactional(readOnly = true)
+    public TodoStatsDueBucketsResponse getDueBucketsStats() {
+        Long userId = currentUserProvider.getCurrentUserId();
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfToday = today.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(23, 59, 59);
+        LocalDateTime startOfTomorrow = today.plusDays(1).atStartOfDay();
+        LocalDateTime endOfThirdDay = today.plusDays(3).atTime(23, 59, 59);
+        LocalDateTime startOfFourthDay = today.plusDays(4).atStartOfDay();
+        LocalDateTime endOfSeventhDay = today.plusDays(7).atTime(23, 59, 59);
+
+        long totalActive = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(userId, "DONE");
+        long overdue = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(userId, "DONE", startOfToday);
+        long dueToday = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(userId, "DONE", startOfToday, endOfToday);
+        long dueIn3Days = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(userId, "DONE", startOfTomorrow, endOfThirdDay);
+        long dueIn7Days = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(userId, "DONE", startOfFourthDay, endOfSeventhDay);
+        long noDueDate = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateIsNull(userId, "DONE");
+
+        return new TodoStatsDueBucketsResponse(overdue, dueToday, dueIn3Days, dueIn7Days, noDueDate, totalActive);
+    }
+
+    /**
+     * 聚合活动任务在各优先级下的分布，供统计页展示优先级结构。
+     *
+     * @return 优先级分布统计结果
+     */
+    @Transactional(readOnly = true)
+    public TodoStatsPriorityDistributionResponse getPriorityDistributionStats() {
+        Long userId = currentUserProvider.getCurrentUserId();
+        long totalActive = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(userId, "DONE");
+
+        List<TodoStatsPriorityDistributionItemResponse> items = todoRepository.summarizeActiveByPriority(userId).stream()
+                .map(row -> new TodoStatsPriorityDistributionItemResponse(
+                        row[0] == null ? null : ((Number) row[0]).intValue(),
+                        row[1] == null ? 0L : ((Number) row[1]).longValue()
+                ))
+                .toList();
+
+        return new TodoStatsPriorityDistributionResponse(items, totalActive);
+    }
+
+    /**
      * 构建最近 7 天完成趋势，并为无数据日期补零，供前端趋势面板直接消费。
      *
      * @param range 时间范围，目前仅支持 7d
@@ -200,7 +252,13 @@ public class TodoService {
         LocalDate startDate = today.minusDays(6);
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = today.atTime(23, 59, 59);
+        Map<LocalDate, Long> createdByDate = new HashMap<>();
         Map<LocalDate, Long> completedByDate = new HashMap<>();
+
+        todoRepository.findCreatedAtBetween(currentUserProvider.getCurrentUserId(), start, end).forEach(createdAt -> {
+            LocalDate createdDate = createdAt.toLocalDate();
+            createdByDate.put(createdDate, createdByDate.getOrDefault(createdDate, 0L) + 1L);
+        });
 
         todoRepository.findCompletedAtBetween(currentUserProvider.getCurrentUserId(), start, end).forEach(completedAt -> {
             LocalDate completedDate = completedAt.toLocalDate();
@@ -208,12 +266,37 @@ public class TodoService {
         });
 
         List<TodoStatsTrendItemResponse> items = new ArrayList<>();
+        long totalCreated = 0L;
+        long totalCompleted = 0L;
         for (int i = 0; i < 7; i++) {
             LocalDate currentDate = startDate.plusDays(i);
-            items.add(new TodoStatsTrendItemResponse(currentDate.toString(), completedByDate.getOrDefault(currentDate, 0L)));
+            long createdCount = createdByDate.getOrDefault(currentDate, 0L);
+            long completedCount = completedByDate.getOrDefault(currentDate, 0L);
+            totalCreated += createdCount;
+            totalCompleted += completedCount;
+            items.add(new TodoStatsTrendItemResponse(currentDate.toString(), createdCount, completedCount));
         }
 
-        return new TodoStatsTrendResponse(SUPPORTED_TREND_RANGE, items);
+        return new TodoStatsTrendResponse(
+                SUPPORTED_TREND_RANGE,
+                items,
+                buildTrendSummary(totalCreated, totalCompleted)
+        );
+    }
+
+    private TodoStatsTrendSummaryResponse buildTrendSummary(long totalCreated, long totalCompleted) {
+        BigDecimal completionRate = totalCreated == 0L
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(totalCompleted)
+                .divide(BigDecimal.valueOf(totalCreated), 4, RoundingMode.HALF_UP)
+                .stripTrailingZeros();
+
+        return new TodoStatsTrendSummaryResponse(
+                totalCreated,
+                totalCompleted,
+                completionRate,
+                totalCreated - totalCompleted
+        );
     }
 
     /**

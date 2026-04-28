@@ -6,10 +6,16 @@ package com.personal.toolkit.todo.dto;
 public class TodoStatsTrendItemResponse {
 
     private final String date;
+    private final long createdCount;
     private final long completedCount;
 
     public TodoStatsTrendItemResponse(String date, long completedCount) {
+        this(date, 0L, completedCount);
+    }
+
+    public TodoStatsTrendItemResponse(String date, long createdCount, long completedCount) {
         this.date = date;
+        this.createdCount = createdCount;
         this.completedCount = completedCount;
     }
 
@@ -20,6 +26,15 @@ public class TodoStatsTrendItemResponse {
      */
     public String getDate() {
         return date;
+    }
+
+    /**
+     * 返回该日期下的新建任务数量。
+     *
+     * @return 新建任务数
+     */
+    public long getCreatedCount() {
+        return createdCount;
     }
 
     /**

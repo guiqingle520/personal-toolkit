@@ -2,18 +2,30 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { TodoStatsCategoryItem, TodoStatsOverview, TodoStatsTrendItem } from './types'
+import type { 
+  TodoStatsCategoryItem, 
+  TodoStatsOverview, 
+  TodoStatsTrendItem,
+  TodoStatsTrendSummary,
+  TodoStatsDueBuckets,
+  TodoStatsPriorityDistribution
+} from './types'
 import {
   buildDashboardCategories,
   buildDashboardKpis,
   buildDashboardSnapshot,
   buildDashboardTrend,
+  buildDashboardDueBuckets,
+  buildDashboardPriorities,
 } from './todoStatsDashboard'
 
 const props = defineProps<{
   overview: TodoStatsOverview | null
   categories: TodoStatsCategoryItem[]
   trend: TodoStatsTrendItem[]
+  trendSummary?: TodoStatsTrendSummary
+  dueBuckets?: TodoStatsDueBuckets | null
+  priorityDistribution?: TodoStatsPriorityDistribution | null
   pageMode?: boolean
 }>()
 
@@ -28,7 +40,7 @@ const displayCategories = computed(() => {
 
 const maxTrendValue = computed(() => {
   if (!props.trend.length) return 0
-  return Math.max(...props.trend.map((trendItem) => trendItem.completedCount))
+  return Math.max(...props.trend.map((trendItem) => Math.max(trendItem.completedCount, trendItem.createdCount ?? 0)))
 })
 
 const intlDateLabel = computed(() => new Intl.DateTimeFormat(locale.value.startsWith('zh') ? 'zh-CN' : 'en-US', {
@@ -42,11 +54,15 @@ const dashboardTrend = computed(() => buildDashboardTrend(props.trend, (date) =>
   return intlDateLabel.value.format(new Date(`${date}T00:00:00`))
 }))
 
-const dashboardSnapshot = computed(() => buildDashboardSnapshot(dashboardTrend.value))
+const dashboardSnapshot = computed(() => buildDashboardSnapshot(dashboardTrend.value, props.trendSummary))
 
 const dashboardCategories = computed(() => buildDashboardCategories(props.categories, (category) => {
   return category === '__UNCLASSIFIED__' ? t('stats.uncategorized') : category
 }))
+
+const dashboardDueBuckets = computed(() => props.dueBuckets ? buildDashboardDueBuckets(props.dueBuckets) : [])
+
+const dashboardPriorityDist = computed(() => props.priorityDistribution ? buildDashboardPriorities(props.priorityDistribution) : [])
 </script>
 
 <template>
@@ -83,6 +99,13 @@ const dashboardCategories = computed(() => buildDashboardCategories(props.catego
             >
               <div class="bars-lg">
                 <div
+                  class="bar-lg created-bar"
+                  :style="{ height: maxTrendValue ? `${(day.createdCount / maxTrendValue) * 100}%` : '0' }"
+                  :title="t('stats.createdOnlyLabel', { count: day.createdCount })"
+                >
+                  <span v-if="day.createdCount > 0" class="bar-value text-muted">{{ day.createdCount }}</span>
+                </div>
+                <div
                   class="bar-lg completed-bar"
                   :class="{ 'is-peak': day.isPeak }"
                   :style="{ height: maxTrendValue ? `${(day.completedCount / maxTrendValue) * 100}%` : '0' }"
@@ -99,9 +122,23 @@ const dashboardCategories = computed(() => buildDashboardCategories(props.catego
         <div class="dashboard-card snapshot-section" data-testid="stats-trend-snapshot">
           <h3>{{ t('stats.snapshotTitle') }}</h3>
           <div class="snapshot-grid">
+            <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="trendTotalCreated">
+              <span class="snapshot-label">{{ t('stats.trendTotalCreated') }}</span>
+              <span class="snapshot-value text-primary">{{ dashboardSnapshot.totalCreated }}</span>
+            </div>
             <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="trendTotalCompleted">
               <span class="snapshot-label">{{ t('stats.trendTotalCompleted') }}</span>
               <span class="snapshot-value text-success">{{ dashboardSnapshot.totalCompleted }}</span>
+            </div>
+            <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="trendNetChange">
+              <span class="snapshot-label">{{ t('stats.trendNetChange') }}</span>
+              <span class="snapshot-value" :class="dashboardSnapshot.netChange > 0 ? 'text-warning' : 'text-success'">
+                {{ dashboardSnapshot.netChange > 0 ? '+' : '' }}{{ dashboardSnapshot.netChange }}
+              </span>
+            </div>
+            <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="completionRate">
+              <span class="snapshot-label">{{ t('stats.completionRate', { rate: '' }).replace(' %', '').replace('%', '') }}</span>
+              <span class="snapshot-value">{{ dashboardSnapshot.completionRate }}%</span>
             </div>
             <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="averagePerShownDay">
               <span class="snapshot-label">{{ t('stats.averagePerShownDay') }}</span>
@@ -123,6 +160,36 @@ const dashboardCategories = computed(() => buildDashboardCategories(props.catego
       </div>
 
       <div class="dashboard-col-side">
+        <div v-if="dashboardDueBuckets.length" class="dashboard-card due-section" data-testid="stats-due-section">
+          <h3>{{ t('stats.dueBuckets') }}</h3>
+          <ul class="dist-list">
+            <li v-for="bucket in dashboardDueBuckets" :key="bucket.key" class="dist-item">
+              <div class="dist-header">
+                <span class="dist-name">{{ t(`stats.${bucket.key}`) }}</span>
+                <span class="dist-count" :class="bucket.toneClass">{{ bucket.count }}</span>
+              </div>
+              <div class="dist-progress-bar">
+                <div class="dist-progress-fill" :class="bucket.toneClass" :style="{ width: `${bucket.percentage}%` }"></div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="dashboardPriorityDist.length" class="dashboard-card priority-section" data-testid="stats-priority-section">
+          <h3>{{ t('stats.priorityDist') }}</h3>
+          <ul class="dist-list">
+            <li v-for="p in dashboardPriorityDist" :key="p.priority" class="dist-item">
+              <div class="dist-header">
+                <span class="dist-name">{{ p.labelKey.includes('.') ? t(p.labelKey) : t(`stats.${p.labelKey}`) }}</span>
+                <span class="dist-count" :class="p.toneClass">{{ p.count }}</span>
+              </div>
+              <div class="dist-progress-bar">
+                <div class="dist-progress-fill" :class="p.toneClass" :style="{ width: `${p.percentage}%` }"></div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
         <div class="dashboard-card category-section" data-testid="stats-categories-section">
           <h3>{{ t('stats.categoryStats') }}</h3>
           <div v-if="!dashboardCategories.length" class="empty-stats">{{ t('stats.empty') }}</div>
@@ -208,6 +275,11 @@ const dashboardCategories = computed(() => buildDashboardCategories(props.catego
             <div class="trend-value">{{ day.completedCount }}</div>
             <div class="bars">
               <div
+                class="bar created-bar"
+                :style="{ height: maxTrendValue ? `${(day.createdCount / maxTrendValue) * 100}%` : '0' }"
+                :title="t('stats.createdOnlyLabel', { count: day.createdCount })"
+              ></div>
+              <div
                 class="bar completed-bar"
                 :style="{ height: maxTrendValue ? `${(day.completedCount / maxTrendValue) * 100}%` : '0' }"
                 :title="t('stats.completedOnlyLabel', { count: day.completedCount })"
@@ -287,6 +359,52 @@ const dashboardCategories = computed(() => buildDashboardCategories(props.catego
   color: var(--text-muted, #aaa);
 }
 
+.dist-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dist-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dist-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.dist-name {
+  color: var(--text-bright, #fff);
+}
+
+.dist-count {
+  font-weight: 600;
+}
+
+.dist-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dist-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.dist-progress-fill.text-warning { background: var(--warning-color, #f59e0b); }
+.dist-progress-fill.text-primary { background: var(--primary-color, #3b82f6); }
+.dist-progress-fill.text-info { background: var(--accent-color, #38bdf8); }
+.dist-progress-fill.text-muted { background: var(--text-muted, #aaa); }
+
 .category-list {
   list-style: none;
   padding: 0;
@@ -364,6 +482,11 @@ const dashboardCategories = computed(() => buildDashboardCategories(props.catego
   min-height: 2px;
   border-radius: 2px 2px 0 0;
   transition: height 0.3s ease;
+}
+
+.created-bar {
+  background: rgba(255, 255, 255, 0.2);
+  margin-right: 2px;
 }
 
 .completed-bar {

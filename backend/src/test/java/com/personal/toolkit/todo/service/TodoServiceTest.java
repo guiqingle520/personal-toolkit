@@ -7,7 +7,10 @@ import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
 import com.personal.toolkit.todo.dto.TodoQueryRequest;
+import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
+import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.dto.TodoSubItemRequest;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
@@ -26,6 +29,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +43,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -84,7 +90,7 @@ class TodoServiceTest {
                 appUserRepository,
                 todoReminderService
         );
-        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
     }
 
     /**
@@ -261,6 +267,135 @@ class TodoServiceTest {
         assertEquals(11L, response.getActiveCount());
         assertEquals(5L, response.getUpcomingReminderCount());
         assertEquals(4L, response.getUnreadReminderCount());
+    }
+
+    /**
+     * 截止时间桶统计应按活动任务和固定日期区间聚合。
+     */
+    @Test
+    void getDueBucketsStatsShouldAggregateCurrentUserBuckets() {
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(20L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(eq(USER_ID), eq("DONE"), any(LocalDateTime.class))).thenReturn(3L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(eq(USER_ID), eq("DONE"), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(4L, 5L, 6L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateIsNull(USER_ID, "DONE")).thenReturn(2L);
+
+        TodoStatsDueBucketsResponse response = todoService.getDueBucketsStats();
+
+        assertEquals(3L, response.getOverdue());
+        assertEquals(4L, response.getDueToday());
+        assertEquals(5L, response.getDueIn3Days());
+        assertEquals(6L, response.getDueIn7Days());
+        assertEquals(2L, response.getNoDueDate());
+        assertEquals(20L, response.getTotalActive());
+    }
+
+    /**
+     * 截止时间桶查询应使用互不重叠的日期边界，避免相邻桶重复计数。
+     */
+    @Test
+    void getDueBucketsStatsShouldUseNonOverlappingDateBoundaries() {
+        LocalDate today = LocalDate.now();
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(0L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(eq(USER_ID), eq("DONE"), argThat(boundary -> today.atStartOfDay().equals(boundary))))
+                .thenReturn(0L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(
+                eq(USER_ID),
+                eq("DONE"),
+                argThat(start -> today.atStartOfDay().equals(start)),
+                argThat(end -> today.atTime(23, 59, 59).equals(end))
+        )).thenReturn(0L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(
+                eq(USER_ID),
+                eq("DONE"),
+                argThat(start -> today.plusDays(1).atStartOfDay().equals(start)),
+                argThat(end -> today.plusDays(3).atTime(23, 59, 59).equals(end))
+        )).thenReturn(0L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBetween(
+                eq(USER_ID),
+                eq("DONE"),
+                argThat(start -> today.plusDays(4).atStartOfDay().equals(start)),
+                argThat(end -> today.plusDays(7).atTime(23, 59, 59).equals(end))
+        )).thenReturn(0L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateIsNull(USER_ID, "DONE")).thenReturn(0L);
+
+        TodoStatsDueBucketsResponse response = todoService.getDueBucketsStats();
+
+        assertEquals(0L, response.getOverdue());
+        assertEquals(0L, response.getDueToday());
+        assertEquals(0L, response.getDueIn3Days());
+        assertEquals(0L, response.getDueIn7Days());
+        assertEquals(0L, response.getNoDueDate());
+        verify(todoRepository).countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(eq(USER_ID), eq("DONE"), argThat(boundary -> today.atStartOfDay().equals(boundary)));
+    }
+
+    /**
+     * 优先级分布统计应返回仓储聚合结果和活动总数。
+     */
+    @Test
+    void getPriorityDistributionStatsShouldReturnPriorityItems() {
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(9L);
+        when(todoRepository.summarizeActiveByPriority(USER_ID)).thenReturn(List.of(
+                new Object[]{1, 2L},
+                new Object[]{3, 7L}
+        ));
+
+        TodoStatsPriorityDistributionResponse response = todoService.getPriorityDistributionStats();
+
+        assertEquals(9L, response.getTotalActive());
+        assertEquals(2, response.getItems().size());
+        assertEquals(1, response.getItems().get(0).getPriority());
+        assertEquals(2L, response.getItems().get(0).getCount());
+        assertEquals(3, response.getItems().get(1).getPriority());
+        assertEquals(7L, response.getItems().get(1).getCount());
+    }
+
+    /**
+     * 趋势统计应同时返回最近 7 天的新建与完成序列，并补齐汇总字段。
+     */
+    @Test
+    void getStatsTrendShouldReturnCreatedCompletedSeriesAndSummary() {
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusDays(6);
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = today.atTime(23, 59, 59);
+        when(todoRepository.findCreatedAtBetween(USER_ID, start, end)).thenReturn(List.of(
+                startDate.atTime(9, 0),
+                startDate.atTime(10, 0),
+                startDate.plusDays(2).atTime(11, 0)
+        ));
+        when(todoRepository.findCompletedAtBetween(USER_ID, start, end)).thenReturn(List.of(
+                startDate.atTime(12, 0),
+                startDate.plusDays(1).atTime(13, 0)
+        ));
+
+        TodoStatsTrendResponse response = todoService.getStatsTrend("7d");
+
+        assertEquals("7d", response.getRange());
+        assertEquals(7, response.getItems().size());
+        assertEquals(startDate.toString(), response.getItems().get(0).getDate());
+        assertEquals(2L, response.getItems().get(0).getCreatedCount());
+        assertEquals(1L, response.getItems().get(0).getCompletedCount());
+        assertEquals(startDate.plusDays(1).toString(), response.getItems().get(1).getDate());
+        assertEquals(0L, response.getItems().get(1).getCreatedCount());
+        assertEquals(1L, response.getItems().get(1).getCompletedCount());
+        assertEquals(startDate.plusDays(2).toString(), response.getItems().get(2).getDate());
+        assertEquals(1L, response.getItems().get(2).getCreatedCount());
+        assertEquals(0L, response.getItems().get(2).getCompletedCount());
+        assertEquals(3L, response.getSummary().getTotalCreated());
+        assertEquals(2L, response.getSummary().getTotalCompleted());
+        assertEquals("0.6667", response.getSummary().getCompletionRate().toPlainString());
+        assertEquals(1L, response.getSummary().getNetChange());
+    }
+
+    /**
+     * 非法趋势范围应继续返回 400，避免不支持的时间范围进入统计逻辑。
+     */
+    @Test
+    void getStatsTrendShouldRejectUnsupportedRange() {
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> todoService.getStatsTrend("30d"));
+
+        assertEquals(400, exception.getStatusCode().value());
     }
 
     /**

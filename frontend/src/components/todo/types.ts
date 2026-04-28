@@ -133,10 +133,38 @@ export interface TodoStatsCategoryItem {
 
 export interface TodoStatsTrendItem {
   date: string
+  createdCount: number
   completedCount: number
+}
+
+export interface TodoStatsTrendSummary {
+  totalCreated: number
+  totalCompleted: number
+  completionRate: number
+  netChange: number
 }
 
 export interface TodoStatsTrend {
   range: string
   items: TodoStatsTrendItem[]
+  summary: TodoStatsTrendSummary
+}
+
+export interface TodoStatsDueBuckets {
+  overdue: number
+  dueToday: number
+  dueIn3Days: number
+  dueIn7Days: number
+  noDueDate: number
+  totalActive: number
+}
+
+export interface TodoStatsPriorityItem {
+  priority: number
+  count: number
+}
+
+export interface TodoStatsPriorityDistribution {
+  items: TodoStatsPriorityItem[]
+  totalActive: number
 }
