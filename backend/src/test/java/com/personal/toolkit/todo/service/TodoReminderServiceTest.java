@@ -151,6 +151,10 @@ class TodoReminderServiceTest {
         assertEquals(4L, response.getReadTodayCount());
         assertEquals(9L, response.getScheduledCount());
         assertEquals(2L, response.getOverdueReminderCount());
+        verify(todoReminderEventRepository).countByUserIdAndStatus(USER_ID, TodoReminderEvent.STATUS_SENT);
+        verify(todoReminderEventRepository).countByUserIdAndStatusAndReadAtBetween(eq(USER_ID), eq(TodoReminderEvent.STATUS_READ), any(LocalDateTime.class), any(LocalDateTime.class));
+        verify(todoReminderEventRepository).countByUserIdAndStatus(USER_ID, TodoReminderEvent.STATUS_PENDING);
+        verify(todoReminderEventRepository).countByUserIdAndStatusAndScheduledAtLessThan(eq(USER_ID), eq(TodoReminderEvent.STATUS_PENDING), any(LocalDateTime.class));
     }
 
     @Test

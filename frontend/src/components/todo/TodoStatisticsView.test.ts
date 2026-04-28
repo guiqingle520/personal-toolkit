@@ -214,4 +214,71 @@ describe('TodoStatisticsView', () => {
 
     expect(fetchMock.mock.calls.length).toBeGreaterThan(beforeCount)
   })
+
+  it('renders page-level statistics semantics for ratio completion rate and NONE recurrence', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/todos/stats/overview')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          todayCompleted: 2,
+          weekCompleted: 7,
+          overdueCount: 3,
+          activeCount: 11,
+          upcomingReminderCount: 5,
+          unreadReminderCount: 4,
+        }) }
+      }
+      if (url.includes('/api/todos/stats/by-category')) {
+        return { ok: true, json: async () => createSuccessResponse([
+          { category: 'Work', activeCount: 4, completedCount: 2 },
+        ]) }
+      }
+      if (url.includes('/api/todos/stats/due-buckets')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          overdue: 1, dueToday: 2, dueIn3Days: 0, dueIn7Days: 0, noDueDate: 1, totalActive: 4,
+        }) }
+      }
+      if (url.includes('/api/todos/stats/priority-distribution')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          items: [{ priority: 5, count: 2 }, { priority: 2, count: 2 }],
+          totalActive: 4,
+        }) }
+      }
+      if (url.includes('/api/todos/stats/aging')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          buckets: [{ label: '0-3 days', count: 2 }],
+          totalPending: 3,
+        }) }
+      }
+      if (url.includes('/api/todo-reminders/stats/summary')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          unreadCount: 4, readTodayCount: 2, scheduledCount: 1, overdueReminderCount: 0,
+        }) }
+      }
+      if (url.includes('/api/todos/stats/recurrence-distribution')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          items: [{ recurrenceType: 'NONE', count: 4 }, { recurrenceType: 'DAILY', count: 1 }],
+          totalActive: 10,
+        }) }
+      }
+
+      return { ok: true, json: async () => createSuccessResponse({
+        range: '7d',
+        items: [
+          { date: '2026-04-01', createdCount: 1, completedCount: 1 },
+        ],
+        summary: {
+          totalCreated: 3,
+          totalCompleted: 2,
+          netChange: 1,
+          completionRate: 0.6667,
+        },
+      }) }
+    })
+
+    const { wrapper } = await mountStatisticsView()
+
+    expect(wrapper.text()).toContain('67%')
+    expect(wrapper.text()).not.toContain('0.6667')
+    expect(wrapper.text()).toContain('None')
+  })
 })

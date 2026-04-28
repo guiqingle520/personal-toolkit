@@ -324,6 +324,9 @@ public class TodoService {
 
         todoRepository.summarizeActiveByRecurrenceType(userId).forEach(row -> {
             String recurrenceType = row[0] == null ? "NONE" : String.valueOf(row[0]).trim().toUpperCase(Locale.ROOT);
+            if (recurrenceType.isBlank()) {
+                recurrenceType = "NONE";
+            }
             long count = row[1] == null ? 0L : ((Number) row[1]).longValue();
             countByType.put(recurrenceType, countByType.getOrDefault(recurrenceType, 0L) + count);
         });

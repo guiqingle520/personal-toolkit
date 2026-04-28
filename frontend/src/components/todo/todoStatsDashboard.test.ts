@@ -150,6 +150,20 @@ describe('todoStatsDashboard', () => {
     expect(aging[3]).toMatchObject({ label: '15+ days', count: 1, percentage: 10, toneClass: 'text-warning' })
   })
 
+  it('builds dashboard aging buckets safely when totalPending is zero', () => {
+    const aging = buildDashboardAging({
+      buckets: [
+        { label: '0-3 days', count: 5 },
+        { label: '4-7 days', count: 3 },
+      ],
+      totalPending: 0,
+    })
+
+    expect(aging).toHaveLength(2)
+    expect(aging[0]).toMatchObject({ label: '0-3 days', count: 5, percentage: 0 })
+    expect(aging[1]).toMatchObject({ label: '4-7 days', count: 3, percentage: 0 })
+  })
+
   it('builds reminder summary items correctly', () => {
     const summary = buildDashboardReminderSummary({
       unreadCount: 4,
@@ -175,5 +189,37 @@ describe('todoStatsDashboard', () => {
     expect(recurrence).toHaveLength(2)
     expect(recurrence[0]).toMatchObject({ recurrenceType: 'DAILY', labelKey: 'recurrence.daily', count: 3, percentage: 60 })
     expect(recurrence[1]).toMatchObject({ recurrenceType: 'WEEKLY', labelKey: 'recurrence.weekly', count: 2, percentage: 40 })
+  })
+
+  it('builds recurrence distribution using totalActive denominator and maps NONE label key', () => {
+    const recurrence = buildDashboardRecurrence({
+      items: [
+        { recurrenceType: 'NONE', count: 4 },
+        { recurrenceType: 'DAILY', count: 1 },
+      ],
+      totalActive: 10,
+    })
+
+    expect(recurrence).toHaveLength(2)
+    expect(recurrence[0]).toMatchObject({ recurrenceType: 'NONE', labelKey: 'recurrence.none', count: 4, percentage: 40 })
+    expect(recurrence[1]).toMatchObject({ recurrenceType: 'DAILY', labelKey: 'recurrence.daily', count: 1, percentage: 10 })
+  })
+
+  it('builds snapshot metrics using non-trivial trend summary ratios', () => {
+    const snapshot = buildDashboardSnapshot([
+      { date: '2026-04-01', label: '04-01', createdCount: 1, completedCount: 1, isPeak: false },
+    ], {
+      totalCreated: 3,
+      totalCompleted: 2,
+      netChange: 1,
+      completionRate: 0.6667,
+    })
+
+    expect(snapshot).toMatchObject({
+      totalCreated: 3,
+      totalCompleted: 2,
+      netChange: 1,
+      completionRate: 67,
+    })
   })
 })

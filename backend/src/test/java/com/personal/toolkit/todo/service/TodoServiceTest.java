@@ -371,6 +371,10 @@ class TodoServiceTest {
         assertEquals(8L, response.getBuckets().get(0).getCount());
         assertEquals("OVER_30_DAYS", response.getBuckets().get(4).getLabel());
         assertEquals(2L, response.getBuckets().get(4).getCount());
+        assertEquals(
+                response.getTotalPending(),
+                response.getBuckets().stream().mapToLong(bucket -> bucket.getCount()).sum()
+        );
     }
 
     /**
@@ -392,6 +396,27 @@ class TodoServiceTest {
         assertEquals(3L, response.getItems().get(1).getCount());
         assertEquals(0L, response.getItems().get(2).getCount());
         assertEquals(2L, response.getItems().get(3).getCount());
+    }
+
+    /**
+     * 空白重复类型也应归并到 NONE，避免分子分母不一致。
+     */
+    @Test
+    void getRecurrenceDistributionStatsShouldFoldBlankTypeIntoNoneBucket() {
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(10L);
+        when(todoRepository.summarizeActiveByRecurrenceType(USER_ID)).thenReturn(List.of(
+                new Object[]{" ", 4L},
+                new Object[]{"DAILY", 1L}
+        ));
+
+        TodoStatsRecurrenceDistributionResponse response = todoService.getRecurrenceDistributionStats();
+
+        assertEquals(10L, response.getTotalActive());
+        assertEquals(List.of("NONE", "DAILY", "WEEKLY", "MONTHLY"), response.getItems().stream().map(item -> item.getRecurrenceType()).toList());
+        assertEquals(4L, response.getItems().get(0).getCount());
+        assertEquals(1L, response.getItems().get(1).getCount());
+        assertEquals(0L, response.getItems().get(2).getCount());
+        assertEquals(0L, response.getItems().get(3).getCount());
     }
 
     /**

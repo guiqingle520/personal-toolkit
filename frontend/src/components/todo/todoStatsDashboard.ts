@@ -232,7 +232,7 @@ export function buildDashboardPriorities(distribution: TodoStatsPriorityDistribu
 }
 
 export function buildDashboardAging(aging: TodoStatsAging): DashboardAgingItem[] {
-  const total = aging.totalPending || 1
+  const total = aging.totalPending
   const buckets = aging.buckets || []
   
   return buckets.map((bucket, index) => {
@@ -242,7 +242,7 @@ export function buildDashboardAging(aging: TodoStatsAging): DashboardAgingItem[]
     return {
       label: bucket.label,
       count: bucket.count,
-      percentage: Math.round((bucket.count / total) * 100),
+      percentage: total > 0 ? Math.round((bucket.count / total) * 100) : 0,
       toneClass
     }
   })
