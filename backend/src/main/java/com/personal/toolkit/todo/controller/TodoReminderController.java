@@ -4,6 +4,7 @@ import com.personal.toolkit.common.api.ApiResponse;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoReminderItemResponse;
 import com.personal.toolkit.todo.dto.TodoReminderQueryRequest;
+import com.personal.toolkit.todo.dto.TodoReminderSummaryResponse;
 import com.personal.toolkit.todo.dto.TodoReminderStatsResponse;
 import com.personal.toolkit.todo.service.TodoReminderService;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +42,14 @@ public class TodoReminderController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Todo reminder stats fetched successfully",
                 todoReminderService.getReminderStats()
+        ));
+    }
+
+    @GetMapping("/stats/summary")
+    public ResponseEntity<ApiResponse<TodoReminderSummaryResponse>> getReminderSummary() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Todo reminder summary fetched successfully",
+                todoReminderService.getReminderSummary()
         ));
     }
 

@@ -3,6 +3,7 @@ package com.personal.toolkit.todo.service;
 import com.personal.toolkit.auth.entity.AppUser;
 import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.todo.dto.PageResponse;
+import com.personal.toolkit.todo.dto.TodoReminderSummaryResponse;
 import com.personal.toolkit.todo.dto.TodoReminderQueryRequest;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.todo.entity.TodoReminderEvent;
@@ -132,6 +133,38 @@ class TodoReminderServiceTest {
         todoReminderService.syncReminderForTodo(todoItem);
 
         verify(todoReminderEventRepository, never()).save(any(TodoReminderEvent.class));
+    }
+
+    @Test
+    void getReminderSummaryShouldReturnDetailedCounts() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(todoReminderEventRepository.countByUserIdAndStatus(USER_ID, TodoReminderEvent.STATUS_SENT)).thenReturn(6L);
+        when(todoReminderEventRepository.countByUserIdAndStatusAndReadAtBetween(eq(USER_ID), eq(TodoReminderEvent.STATUS_READ), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(4L);
+        when(todoReminderEventRepository.countByUserIdAndStatus(USER_ID, TodoReminderEvent.STATUS_PENDING)).thenReturn(9L);
+        when(todoReminderEventRepository.countByUserIdAndStatusAndScheduledAtLessThan(eq(USER_ID), eq(TodoReminderEvent.STATUS_PENDING), any(LocalDateTime.class)))
+                .thenReturn(2L);
+
+        TodoReminderSummaryResponse response = todoReminderService.getReminderSummary();
+
+        assertEquals(6L, response.getUnreadCount());
+        assertEquals(4L, response.getReadTodayCount());
+        assertEquals(9L, response.getScheduledCount());
+        assertEquals(2L, response.getOverdueReminderCount());
+    }
+
+    @Test
+    void getReminderSummaryShouldReturnZerosWhenReminderTableMissing() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(todoReminderEventRepository.countByUserIdAndStatus(USER_ID, TodoReminderEvent.STATUS_SENT))
+                .thenThrow(new InvalidDataAccessResourceUsageException("missing table"));
+
+        TodoReminderSummaryResponse response = todoReminderService.getReminderSummary();
+
+        assertEquals(0L, response.getUnreadCount());
+        assertEquals(0L, response.getReadTodayCount());
+        assertEquals(0L, response.getScheduledCount());
+        assertEquals(0L, response.getOverdueReminderCount());
     }
 
     private TodoItem createTodo(Long id, String status, LocalDateTime remindAt) {

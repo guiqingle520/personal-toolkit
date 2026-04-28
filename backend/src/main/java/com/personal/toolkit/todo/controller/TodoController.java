@@ -6,10 +6,12 @@ import com.personal.toolkit.todo.dto.TodoBatchRequest;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
 import com.personal.toolkit.todo.dto.TodoQueryRequest;
+import com.personal.toolkit.todo.dto.TodoStatsAgingResponse;
 import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
 import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsRecurrenceDistributionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.todo.service.TodoService;
@@ -118,6 +120,29 @@ public class TodoController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Todo priority distribution fetched successfully",
                 todoService.getPriorityDistributionStats()
+        ));
+    }
+
+    /**
+     * 查询活动待办按创建时长聚合的老化统计结果。
+     *
+     * @return 老化统计统一响应体
+     */
+    @GetMapping("/stats/aging")
+    public ResponseEntity<ApiResponse<TodoStatsAgingResponse>> getAgingStats() {
+        return ResponseEntity.ok(ApiResponse.success("Todo aging stats fetched successfully", todoService.getAgingStats()));
+    }
+
+    /**
+     * 查询活动待办按重复类型聚合的分布结果。
+     *
+     * @return 重复类型分布统计统一响应体
+     */
+    @GetMapping("/stats/recurrence-distribution")
+    public ResponseEntity<ApiResponse<TodoStatsRecurrenceDistributionResponse>> getRecurrenceDistributionStats() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Todo recurrence distribution fetched successfully",
+                todoService.getRecurrenceDistributionStats()
         ));
     }
 

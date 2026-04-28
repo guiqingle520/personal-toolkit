@@ -48,6 +48,27 @@ function mountWithLocale(locale: 'en' | 'zh-CN' = 'en', pageMode = false) {
         ],
         totalActive: 11,
       },
+      aging: {
+        buckets: [
+          { label: '0-3 days', count: 5 },
+          { label: '4-7 days', count: 3 },
+          { label: '8-14 days', count: 2 }
+        ],
+        totalPending: 10
+      },
+      reminderSummary: {
+        unreadCount: 4,
+        readTodayCount: 2,
+        scheduledCount: 10,
+        overdueReminderCount: 1
+      },
+      recurrenceDistribution: {
+        items: [
+          { recurrenceType: 'DAILY', count: 3 },
+          { recurrenceType: 'WEEKLY', count: 2 }
+        ],
+        totalActive: 5
+      },
       pageMode,
     },
     global: {
@@ -100,12 +121,18 @@ describe('TodoStatsPanel', () => {
     expect(wrapper.find('[data-testid="stats-categories-section"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="stats-due-section"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="stats-priority-section"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stats-aging-section"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stats-reminder-section"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stats-recurrence-section"]').exists()).toBe(true)
     
     // Check trend snapshot specific text for English
     expect(wrapper.text()).toContain('Created in shown trend')
     expect(wrapper.text()).toContain('Net change')
     expect(wrapper.text()).toContain('Priority Distribution')
+    expect(wrapper.text()).toContain('Aging Distribution')
     expect(wrapper.text()).toContain('Due Timeline')
+    expect(wrapper.text()).toContain('Reminder Summary')
+    expect(wrapper.text()).toContain('Recurrence Distribution')
   })
 
   it('sorts category rows deterministically in page mode', () => {

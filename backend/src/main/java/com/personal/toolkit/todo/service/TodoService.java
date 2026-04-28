@@ -7,11 +7,15 @@ import com.personal.toolkit.todo.dto.TodoQueryRequest;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsAgingBucketItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsAgingResponse;
 import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
 import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsRecurrenceDistributionItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsRecurrenceDistributionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendSummaryResponse;
@@ -49,6 +53,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -234,6 +239,100 @@ public class TodoService {
                 .toList();
 
         return new TodoStatsPriorityDistributionResponse(items, totalActive);
+    }
+
+    /**
+     * 聚合活动待办按创建时长分布的老化统计，供统计页展示积压风险。
+     *
+     * @return 老化分布统计结果
+     */
+    @Transactional(readOnly = true)
+    public TodoStatsAgingResponse getAgingStats() {
+        Long userId = currentUserProvider.getCurrentUserId();
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfToday = today.atStartOfDay();
+        LocalDateTime startOfFourDaysAgo = today.minusDays(3).atStartOfDay();
+        LocalDateTime startOfEightDaysAgo = today.minusDays(7).atStartOfDay();
+        LocalDateTime startOfFifteenDaysAgo = today.minusDays(14).atStartOfDay();
+        LocalDateTime startOfThirtyOneDaysAgo = today.minusDays(30).atStartOfDay();
+
+        long totalPending = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(userId, "DONE");
+        List<TodoStatsAgingBucketItemResponse> buckets = List.of(
+                new TodoStatsAgingBucketItemResponse(
+                        "0_3_DAYS",
+                        todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBetween(
+                                userId,
+                                "DONE",
+                                startOfFourDaysAgo,
+                                today.atTime(23, 59, 59)
+                        )
+                ),
+                new TodoStatsAgingBucketItemResponse(
+                        "4_7_DAYS",
+                        todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBetween(
+                                userId,
+                                "DONE",
+                                startOfEightDaysAgo,
+                                startOfFourDaysAgo.minusSeconds(1)
+                        )
+                ),
+                new TodoStatsAgingBucketItemResponse(
+                        "8_14_DAYS",
+                        todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBetween(
+                                userId,
+                                "DONE",
+                                startOfFifteenDaysAgo,
+                                startOfEightDaysAgo.minusSeconds(1)
+                        )
+                ),
+                new TodoStatsAgingBucketItemResponse(
+                        "15_30_DAYS",
+                        todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBetween(
+                                userId,
+                                "DONE",
+                                startOfThirtyOneDaysAgo,
+                                startOfFifteenDaysAgo.minusSeconds(1)
+                        )
+                ),
+                new TodoStatsAgingBucketItemResponse(
+                        "OVER_30_DAYS",
+                        todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBefore(
+                                userId,
+                                "DONE",
+                                startOfThirtyOneDaysAgo
+                        )
+                )
+        );
+
+        return new TodoStatsAgingResponse(buckets, totalPending);
+    }
+
+    /**
+     * 聚合活动待办按重复类型分布的统计结果。
+     *
+     * @return 重复类型分布统计结果
+     */
+    @Transactional(readOnly = true)
+    public TodoStatsRecurrenceDistributionResponse getRecurrenceDistributionStats() {
+        Long userId = currentUserProvider.getCurrentUserId();
+        long totalActive = todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(userId, "DONE");
+        Map<String, Long> countByType = new LinkedHashMap<>();
+        countByType.put("NONE", 0L);
+        countByType.put("DAILY", 0L);
+        countByType.put("WEEKLY", 0L);
+        countByType.put("MONTHLY", 0L);
+
+        todoRepository.summarizeActiveByRecurrenceType(userId).forEach(row -> {
+            String recurrenceType = row[0] == null ? "NONE" : String.valueOf(row[0]).trim().toUpperCase(Locale.ROOT);
+            long count = row[1] == null ? 0L : ((Number) row[1]).longValue();
+            countByType.put(recurrenceType, countByType.getOrDefault(recurrenceType, 0L) + count);
+        });
+
+        List<TodoStatsRecurrenceDistributionItemResponse> items = List.of("NONE", "DAILY", "WEEKLY", "MONTHLY").stream()
+                .map(type -> new TodoStatsRecurrenceDistributionItemResponse(type, countByType.getOrDefault(type, 0L)))
+                .toList();
+
+        return new TodoStatsRecurrenceDistributionResponse(items, totalActive);
     }
 
     /**

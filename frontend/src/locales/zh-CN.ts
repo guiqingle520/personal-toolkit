@@ -209,7 +209,14 @@ const zhCN = {
     bucket7Days: '7日内到期',
     bucketNoDate: '无到期日',
     priorityDist: '优先级分布',
-    createdOnlyLabel: '新建：{count}'
+    createdOnlyLabel: '新建：{count}',
+    agingDistribution: '任务滞留分布',
+    reminderSummaryTitle: '提醒概览',
+    reminderUnread: '未读提醒',
+    reminderReadToday: '今日已读',
+    reminderScheduled: '计划中提醒',
+    reminderOverdue: '逾期提醒',
+    recurrenceDistribution: '重复任务分布'
   },
   kanban: {
     pendingColumn: '待办',

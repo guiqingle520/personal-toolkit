@@ -7,6 +7,9 @@ import {
   buildDashboardTrend,
   buildDashboardDueBuckets,
   buildDashboardPriorities,
+  buildDashboardAging,
+  buildDashboardReminderSummary,
+  buildDashboardRecurrence,
 } from './todoStatsDashboard'
 
 describe('todoStatsDashboard', () => {
@@ -128,5 +131,49 @@ describe('todoStatsDashboard', () => {
     expect(distribution).toHaveLength(5)
     expect(distribution[0]).toMatchObject({ priority: 5, labelKey: 'priority.critical', count: 3, percentage: 27 })
     expect(distribution[4]).toMatchObject({ priority: 1, labelKey: 'priority.backlog', count: 8, percentage: 73 })
+  })
+
+  it('builds dashboard aging buckets correctly', () => {
+    const aging = buildDashboardAging({
+      buckets: [
+        { label: '0-3 days', count: 5 },
+        { label: '4-7 days', count: 3 },
+        { label: '8-14 days', count: 1 },
+        { label: '15+ days', count: 1 }
+      ],
+      totalPending: 10
+    })
+
+    expect(aging).toHaveLength(4)
+    expect(aging[0]).toMatchObject({ label: '0-3 days', count: 5, percentage: 50, toneClass: 'text-primary' })
+    expect(aging[1]).toMatchObject({ label: '4-7 days', count: 3, percentage: 30, toneClass: 'text-info' })
+    expect(aging[3]).toMatchObject({ label: '15+ days', count: 1, percentage: 10, toneClass: 'text-warning' })
+  })
+
+  it('builds reminder summary items correctly', () => {
+    const summary = buildDashboardReminderSummary({
+      unreadCount: 4,
+      readTodayCount: 2,
+      scheduledCount: 10,
+      overdueReminderCount: 1
+    })
+
+    expect(summary).toHaveLength(4)
+    expect(summary[0]).toMatchObject({ key: 'reminderUnread', count: 4, toneClass: 'text-warning' })
+    expect(summary[1]).toMatchObject({ key: 'reminderReadToday', count: 2, toneClass: 'text-success' })
+  })
+
+  it('builds recurrence distribution correctly', () => {
+    const recurrence = buildDashboardRecurrence({
+      items: [
+        { recurrenceType: 'DAILY', count: 3 },
+        { recurrenceType: 'WEEKLY', count: 2 }
+      ],
+      totalActive: 5
+    })
+
+    expect(recurrence).toHaveLength(2)
+    expect(recurrence[0]).toMatchObject({ recurrenceType: 'DAILY', labelKey: 'recurrence.daily', count: 3, percentage: 60 })
+    expect(recurrence[1]).toMatchObject({ recurrenceType: 'WEEKLY', labelKey: 'recurrence.weekly', count: 2, percentage: 40 })
   })
 })

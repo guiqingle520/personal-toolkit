@@ -27,4 +27,11 @@ public interface TodoReminderEventRepository extends JpaRepository<TodoReminderE
     Page<TodoReminderEvent> findByUserIdAndStatus(Long userId, String status, Pageable pageable);
 
     long countByUserIdAndStatus(Long userId, String status);
+
+    long countByUserIdAndStatusAndReadAtBetween(Long userId,
+                                                String status,
+                                                LocalDateTime readAtStart,
+                                                LocalDateTime readAtEnd);
+
+    long countByUserIdAndStatusAndScheduledAtLessThan(Long userId, String status, LocalDateTime scheduledAt);
 }

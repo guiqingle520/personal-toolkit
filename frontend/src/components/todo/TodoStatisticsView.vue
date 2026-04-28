@@ -21,7 +21,10 @@ import type {
   TodoStatsTrendItem,
   TodoStatsTrendSummary,
   TodoStatsDueBuckets,
-  TodoStatsPriorityDistribution
+  TodoStatsPriorityDistribution,
+  TodoStatsAging,
+  TodoReminderSummary,
+  TodoStatsRecurrenceDistribution
 } from './types'
 
 const router = useRouter()
@@ -33,6 +36,9 @@ const trend = ref<TodoStatsTrendItem[]>([])
 const trendSummary = ref<TodoStatsTrendSummary | undefined>(undefined)
 const dueBuckets = ref<TodoStatsDueBuckets | null>(null)
 const priorityDistribution = ref<TodoStatsPriorityDistribution | null>(null)
+const aging = ref<TodoStatsAging | null>(null)
+const reminderSummary = ref<TodoReminderSummary | null>(null)
+const recurrenceDistribution = ref<TodoStatsRecurrenceDistribution | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 
@@ -60,12 +66,15 @@ async function loadStats() {
   errorMessage.value = ''
 
   try {
-    const [overviewRes, categoryRes, trendRes, dueBucketsRes, priorityDistRes] = await Promise.all([
+    const [overviewRes, categoryRes, trendRes, dueBucketsRes, priorityDistRes, agingRes, reminderRes, recurrenceRes] = await Promise.all([
       fetchApi<TodoStatsOverview>('/api/todos/stats/overview'),
       fetchApi<TodoStatsCategoryItem[]>('/api/todos/stats/by-category'),
       fetchApi<{ range: string; items: TodoStatsTrendItem[]; summary: TodoStatsTrendSummary }>('/api/todos/stats/trend?range=7d'),
       fetchApi<TodoStatsDueBuckets>('/api/todos/stats/due-buckets'),
       fetchApi<TodoStatsPriorityDistribution>('/api/todos/stats/priority-distribution'),
+      fetchApi<TodoStatsAging>('/api/todos/stats/aging'),
+      fetchApi<TodoReminderSummary>('/api/todo-reminders/stats/summary'),
+      fetchApi<TodoStatsRecurrenceDistribution>('/api/todos/stats/recurrence-distribution'),
     ])
 
     overview.value = overviewRes.data || null
@@ -74,6 +83,9 @@ async function loadStats() {
     trendSummary.value = trendRes.data?.summary
     dueBuckets.value = dueBucketsRes.data || null
     priorityDistribution.value = priorityDistRes.data || null
+    aging.value = agingRes.data || null
+    reminderSummary.value = reminderRes.data || null
+    recurrenceDistribution.value = recurrenceRes.data || null
   } catch (error) {
     overview.value = null
     categories.value = []
@@ -81,6 +93,9 @@ async function loadStats() {
     trendSummary.value = undefined
     dueBuckets.value = null
     priorityDistribution.value = null
+    aging.value = null
+    reminderSummary.value = null
+    recurrenceDistribution.value = null
     errorMessage.value = error instanceof Error ? error.message : t('feedback.unexpectedError')
   } finally {
     loading.value = false
@@ -157,6 +172,9 @@ onMounted(() => {
         :trend-summary="trendSummary"
         :due-buckets="dueBuckets"
         :priority-distribution="priorityDistribution"
+        :aging="aging"
+        :reminder-summary="reminderSummary"
+        :recurrence-distribution="recurrenceDistribution"
         page-mode
       />
     </div>

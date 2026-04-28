@@ -168,3 +168,30 @@ export interface TodoStatsPriorityDistribution {
   items: TodoStatsPriorityItem[]
   totalActive: number
 }
+
+export interface TodoStatsAgingBucket {
+  label: string
+  count: number
+}
+
+export interface TodoStatsAging {
+  buckets: TodoStatsAgingBucket[]
+  totalPending: number
+}
+
+export interface TodoReminderSummary {
+  unreadCount: number
+  readTodayCount: number
+  scheduledCount: number
+  overdueReminderCount: number
+}
+
+export interface TodoStatsRecurrenceItem {
+  recurrenceType: string
+  count: number
+}
+
+export interface TodoStatsRecurrenceDistribution {
+  items: TodoStatsRecurrenceItem[]
+  totalActive: number
+}

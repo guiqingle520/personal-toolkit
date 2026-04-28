@@ -8,7 +8,10 @@ import type {
   TodoStatsTrendItem,
   TodoStatsTrendSummary,
   TodoStatsDueBuckets,
-  TodoStatsPriorityDistribution
+  TodoStatsPriorityDistribution,
+  TodoStatsAging,
+  TodoReminderSummary,
+  TodoStatsRecurrenceDistribution
 } from './types'
 import {
   buildDashboardCategories,
@@ -17,6 +20,9 @@ import {
   buildDashboardTrend,
   buildDashboardDueBuckets,
   buildDashboardPriorities,
+  buildDashboardAging,
+  buildDashboardReminderSummary,
+  buildDashboardRecurrence
 } from './todoStatsDashboard'
 
 const props = defineProps<{
@@ -26,6 +32,9 @@ const props = defineProps<{
   trendSummary?: TodoStatsTrendSummary
   dueBuckets?: TodoStatsDueBuckets | null
   priorityDistribution?: TodoStatsPriorityDistribution | null
+  aging?: TodoStatsAging | null
+  reminderSummary?: TodoReminderSummary | null
+  recurrenceDistribution?: TodoStatsRecurrenceDistribution | null
   pageMode?: boolean
 }>()
 
@@ -63,6 +72,12 @@ const dashboardCategories = computed(() => buildDashboardCategories(props.catego
 const dashboardDueBuckets = computed(() => props.dueBuckets ? buildDashboardDueBuckets(props.dueBuckets) : [])
 
 const dashboardPriorityDist = computed(() => props.priorityDistribution ? buildDashboardPriorities(props.priorityDistribution) : [])
+
+const dashboardAging = computed(() => props.aging ? buildDashboardAging(props.aging) : [])
+
+const dashboardReminderSummary = computed(() => props.reminderSummary ? buildDashboardReminderSummary(props.reminderSummary) : [])
+
+const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildDashboardRecurrence(props.recurrenceDistribution) : [])
 </script>
 
 <template>
@@ -157,9 +172,34 @@ const dashboardPriorityDist = computed(() => props.priorityDistribution ? buildD
             </div>
           </div>
         </div>
+
+        <div v-if="dashboardReminderSummary.length" class="dashboard-card reminder-summary-section" data-testid="stats-reminder-section">
+          <h3>{{ t('stats.reminderSummaryTitle') }}</h3>
+          <div class="snapshot-grid">
+            <div v-for="item in dashboardReminderSummary" :key="item.key" class="snapshot-item">
+              <span class="snapshot-label">{{ t(`stats.${item.key}`) }}</span>
+              <span class="snapshot-value" :class="item.toneClass">{{ item.count }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="dashboard-col-side">
+        <div v-if="dashboardAging.length" class="dashboard-card aging-section" data-testid="stats-aging-section">
+          <h3>{{ t('stats.agingDistribution') }}</h3>
+          <ul class="dist-list">
+            <li v-for="bucket in dashboardAging" :key="bucket.label" class="dist-item">
+              <div class="dist-header">
+                <span class="dist-name">{{ bucket.label }}</span>
+                <span class="dist-count" :class="bucket.toneClass">{{ bucket.count }}</span>
+              </div>
+              <div class="dist-progress-bar">
+                <div class="dist-progress-fill" :class="bucket.toneClass" :style="{ width: `${bucket.percentage}%` }"></div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
         <div v-if="dashboardDueBuckets.length" class="dashboard-card due-section" data-testid="stats-due-section">
           <h3>{{ t('stats.dueBuckets') }}</h3>
           <ul class="dist-list">
@@ -185,6 +225,21 @@ const dashboardPriorityDist = computed(() => props.priorityDistribution ? buildD
               </div>
               <div class="dist-progress-bar">
                 <div class="dist-progress-fill" :class="p.toneClass" :style="{ width: `${p.percentage}%` }"></div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="dashboardRecurrence.length" class="dashboard-card recurrence-section" data-testid="stats-recurrence-section">
+          <h3>{{ t('stats.recurrenceDistribution') }}</h3>
+          <ul class="dist-list">
+            <li v-for="item in dashboardRecurrence" :key="item.recurrenceType" class="dist-item">
+              <div class="dist-header">
+                <span class="dist-name">{{ t(item.labelKey) }}</span>
+                <span class="dist-count">{{ item.count }}</span>
+              </div>
+              <div class="dist-progress-bar">
+                <div class="dist-progress-fill text-primary" :style="{ width: `${item.percentage}%` }"></div>
               </div>
             </li>
           </ul>

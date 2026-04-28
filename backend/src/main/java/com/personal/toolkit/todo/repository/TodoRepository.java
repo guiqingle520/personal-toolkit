@@ -48,6 +48,13 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long>, JpaSpecif
 
     long countByUserIdAndDeletedAtIsNullAndStatusNotAndDueDateBefore(Long userId, String status, LocalDateTime dueDate);
 
+    long countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBefore(Long userId, String status, LocalDateTime createTime);
+
+    long countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBetween(Long userId,
+                                                                         String status,
+                                                                         LocalDateTime createTimeStart,
+                                                                         LocalDateTime createTimeEnd);
+
     long countByUserIdAndDeletedAtIsNullAndStatusNotAndRemindAtBetween(Long userId,
                                                                        String status,
                                                                        LocalDateTime remindAtStart,
@@ -98,4 +105,16 @@ public interface TodoRepository extends JpaRepository<TodoItem, Long>, JpaSpecif
              order by t.priority asc
              """)
     List<Object[]> summarizeActiveByPriority(@Param("userId") Long userId);
+
+    @Query("""
+             select t.recurrenceType,
+                    count(t)
+             from TodoItem t
+             where t.user.id = :userId
+               and t.deletedAt is null
+               and t.status <> 'DONE'
+             group by t.recurrenceType
+             order by t.recurrenceType asc
+             """)
+    List<Object[]> summarizeActiveByRecurrenceType(@Param("userId") Long userId);
 }

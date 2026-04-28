@@ -209,7 +209,14 @@ const en = {
     bucket7Days: 'Next 7 Days',
     bucketNoDate: 'No Due Date',
     priorityDist: 'Priority Distribution',
-    createdOnlyLabel: 'Created: {count}'
+    createdOnlyLabel: 'Created: {count}',
+    agingDistribution: 'Aging Distribution',
+    reminderSummaryTitle: 'Reminder Summary',
+    reminderUnread: 'Unread Reminders',
+    reminderReadToday: 'Read Today',
+    reminderScheduled: 'Scheduled Reminders',
+    reminderOverdue: 'Overdue Reminders',
+    recurrenceDistribution: 'Recurrence Distribution'
   },
   kanban: {
     pendingColumn: 'Pending',

@@ -66,6 +66,23 @@ describe('TodoStatisticsView', () => {
           totalActive: 4
         }) }
       }
+      if (url.includes('/api/todos/stats/aging')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          buckets: [{ label: '0-3 days', count: 5 }],
+          totalPending: 5
+        }) }
+      }
+      if (url.includes('/api/todo-reminders/stats/summary')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          unreadCount: 4, readTodayCount: 2, scheduledCount: 1, overdueReminderCount: 0
+        }) }
+      }
+      if (url.includes('/api/todos/stats/recurrence-distribution')) {
+        return { ok: true, json: async () => createSuccessResponse({
+          items: [{ recurrenceType: 'DAILY', count: 3 }],
+          totalActive: 3
+        }) }
+      }
 
       return { ok: true, json: async () => createSuccessResponse({
         range: '7d',
@@ -130,6 +147,30 @@ describe('TodoStatisticsView', () => {
     )
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/todos/stats/priority-distribution',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos/stats/aging',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todo-reminders/stats/summary',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos/stats/recurrence-distribution',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',

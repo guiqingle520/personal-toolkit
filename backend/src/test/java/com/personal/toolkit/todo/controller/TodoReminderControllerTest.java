@@ -8,6 +8,7 @@ import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoReminderItemResponse;
+import com.personal.toolkit.todo.dto.TodoReminderSummaryResponse;
 import com.personal.toolkit.todo.dto.TodoReminderStatsResponse;
 import com.personal.toolkit.todo.service.TodoReminderService;
 import org.junit.jupiter.api.Test;
@@ -85,6 +86,19 @@ class TodoReminderControllerTest {
         mockMvc.perform(get("/api/todo-reminders/stats"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.unreadCount").value(4));
+    }
+
+    @Test
+    void getReminderSummaryShouldReturnSummaryPayload() throws Exception {
+        when(todoReminderService.getReminderSummary()).thenReturn(new TodoReminderSummaryResponse(6, 4, 9, 2));
+
+        mockMvc.perform(get("/api/todo-reminders/stats/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Todo reminder summary fetched successfully"))
+                .andExpect(jsonPath("$.data.unreadCount").value(6))
+                .andExpect(jsonPath("$.data.readTodayCount").value(4))
+                .andExpect(jsonPath("$.data.scheduledCount").value(9))
+                .andExpect(jsonPath("$.data.overdueReminderCount").value(2));
     }
 
     @Test

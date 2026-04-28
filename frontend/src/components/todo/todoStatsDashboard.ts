@@ -4,7 +4,10 @@ import type {
   TodoStatsTrendItem,
   TodoStatsTrendSummary,
   TodoStatsDueBuckets,
-  TodoStatsPriorityDistribution
+  TodoStatsPriorityDistribution,
+  TodoStatsAging,
+  TodoReminderSummary,
+  TodoStatsRecurrenceDistribution
 } from './types'
 
 export type DashboardKpiKey =
@@ -64,6 +67,26 @@ export type DashboardPriorityItem = {
   count: number
   percentage: number
   toneClass: string
+}
+
+export type DashboardAgingItem = {
+  label: string
+  count: number
+  percentage: number
+  toneClass: string
+}
+
+export type DashboardReminderSummaryItem = {
+  key: string
+  count: number
+  toneClass: string
+}
+
+export type DashboardRecurrenceItem = {
+  recurrenceType: string
+  labelKey: string
+  count: number
+  percentage: number
 }
 
 export function buildDashboardKpis(overview: TodoStatsOverview): DashboardKpiItem[] {
@@ -206,4 +229,41 @@ export function buildDashboardPriorities(distribution: TodoStatsPriorityDistribu
       toneClass,
     }
   })
+}
+
+export function buildDashboardAging(aging: TodoStatsAging): DashboardAgingItem[] {
+  const total = aging.totalPending || 1
+  const buckets = aging.buckets || []
+  
+  return buckets.map((bucket, index) => {
+    let toneClass = 'text-primary'
+    if (index >= 3) toneClass = 'text-warning'
+    else if (index >= 1) toneClass = 'text-info'
+    return {
+      label: bucket.label,
+      count: bucket.count,
+      percentage: Math.round((bucket.count / total) * 100),
+      toneClass
+    }
+  })
+}
+
+export function buildDashboardReminderSummary(summary: TodoReminderSummary): DashboardReminderSummaryItem[] {
+  return [
+    { key: 'reminderUnread', count: summary.unreadCount || 0, toneClass: 'text-warning' },
+    { key: 'reminderReadToday', count: summary.readTodayCount || 0, toneClass: 'text-success' },
+    { key: 'reminderScheduled', count: summary.scheduledCount || 0, toneClass: 'text-info' },
+    { key: 'reminderOverdue', count: summary.overdueReminderCount || 0, toneClass: 'text-warning' },
+  ]
+}
+
+export function buildDashboardRecurrence(distribution: TodoStatsRecurrenceDistribution): DashboardRecurrenceItem[] {
+  const total = distribution.totalActive || 1
+  const items = distribution.items || []
+  return items.map(item => ({
+    recurrenceType: item.recurrenceType,
+    labelKey: `recurrence.${(item.recurrenceType || 'none').toLowerCase()}`,
+    count: item.count,
+    percentage: Math.round((item.count / total) * 100),
+  }))
 }

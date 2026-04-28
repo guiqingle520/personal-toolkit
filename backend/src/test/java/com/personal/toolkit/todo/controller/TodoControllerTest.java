@@ -11,11 +11,15 @@ import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoBatchRequest;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsAgingBucketItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsAgingResponse;
 import com.personal.toolkit.todo.dto.TodoStatsCategoryItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
 import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsRecurrenceDistributionItemResponse;
+import com.personal.toolkit.todo.dto.TodoStatsRecurrenceDistributionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendItemResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendSummaryResponse;
@@ -186,6 +190,42 @@ class TodoControllerTest {
                 .andExpect(jsonPath("$.data.items[0].priority").value(1))
                 .andExpect(jsonPath("$.data.items[0].count").value(2))
                 .andExpect(jsonPath("$.data.totalActive").value(9));
+    }
+
+    @Test
+    void getAgingStatsShouldReturnAgingPayload() throws Exception {
+        when(todoService.getAgingStats()).thenReturn(new TodoStatsAgingResponse(
+                List.of(
+                        new TodoStatsAgingBucketItemResponse("0_3_DAYS", 8),
+                        new TodoStatsAgingBucketItemResponse("4_7_DAYS", 5)
+                ),
+                13
+        ));
+
+        mockMvc.perform(get("/api/todos/stats/aging"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Todo aging stats fetched successfully"))
+                .andExpect(jsonPath("$.data.buckets[0].label").value("0_3_DAYS"))
+                .andExpect(jsonPath("$.data.buckets[0].count").value(8))
+                .andExpect(jsonPath("$.data.totalPending").value(13));
+    }
+
+    @Test
+    void getRecurrenceDistributionStatsShouldReturnRecurrencePayload() throws Exception {
+        when(todoService.getRecurrenceDistributionStats()).thenReturn(new TodoStatsRecurrenceDistributionResponse(
+                List.of(
+                        new TodoStatsRecurrenceDistributionItemResponse("NONE", 4),
+                        new TodoStatsRecurrenceDistributionItemResponse("DAILY", 2)
+                ),
+                6
+        ));
+
+        mockMvc.perform(get("/api/todos/stats/recurrence-distribution"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Todo recurrence distribution fetched successfully"))
+                .andExpect(jsonPath("$.data.items[0].recurrenceType").value("NONE"))
+                .andExpect(jsonPath("$.data.items[0].count").value(4))
+                .andExpect(jsonPath("$.data.totalActive").value(6));
     }
 
     /**

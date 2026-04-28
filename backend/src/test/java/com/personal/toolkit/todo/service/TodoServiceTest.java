@@ -7,9 +7,11 @@ import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.todo.dto.TodoItemRequest;
 import com.personal.toolkit.todo.dto.TodoOptionResponse;
 import com.personal.toolkit.todo.dto.TodoQueryRequest;
+import com.personal.toolkit.todo.dto.TodoStatsAgingResponse;
 import com.personal.toolkit.todo.dto.TodoStatsDueBucketsResponse;
 import com.personal.toolkit.todo.dto.TodoStatsOverviewResponse;
 import com.personal.toolkit.todo.dto.TodoStatsPriorityDistributionResponse;
+import com.personal.toolkit.todo.dto.TodoStatsRecurrenceDistributionResponse;
 import com.personal.toolkit.todo.dto.TodoStatsTrendResponse;
 import com.personal.toolkit.todo.dto.TodoSubItemRequest;
 import com.personal.toolkit.todo.dto.TodoSubItemSummaryResponse;
@@ -348,6 +350,48 @@ class TodoServiceTest {
         assertEquals(2L, response.getItems().get(0).getCount());
         assertEquals(3, response.getItems().get(1).getPriority());
         assertEquals(7L, response.getItems().get(1).getCount());
+    }
+
+    /**
+     * 老化统计应按固定创建时长桶聚合当前用户的活动任务。
+     */
+    @Test
+    void getAgingStatsShouldReturnFixedBuckets() {
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(24L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBetween(eq(USER_ID), eq("DONE"), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(8L, 5L, 6L, 3L);
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNotAndCreateTimeBefore(eq(USER_ID), eq("DONE"), any(LocalDateTime.class)))
+                .thenReturn(2L);
+
+        TodoStatsAgingResponse response = todoService.getAgingStats();
+
+        assertEquals(24L, response.getTotalPending());
+        assertEquals(5, response.getBuckets().size());
+        assertEquals("0_3_DAYS", response.getBuckets().get(0).getLabel());
+        assertEquals(8L, response.getBuckets().get(0).getCount());
+        assertEquals("OVER_30_DAYS", response.getBuckets().get(4).getLabel());
+        assertEquals(2L, response.getBuckets().get(4).getCount());
+    }
+
+    /**
+     * 重复类型分布应返回稳定顺序，并为缺失桶补零。
+     */
+    @Test
+    void getRecurrenceDistributionStatsShouldReturnStableBuckets() {
+        when(todoRepository.countByUserIdAndDeletedAtIsNullAndStatusNot(USER_ID, "DONE")).thenReturn(10L);
+        when(todoRepository.summarizeActiveByRecurrenceType(USER_ID)).thenReturn(List.of(
+                new Object[]{"DAILY", 3L},
+                new Object[]{"MONTHLY", 2L}
+        ));
+
+        TodoStatsRecurrenceDistributionResponse response = todoService.getRecurrenceDistributionStats();
+
+        assertEquals(10L, response.getTotalActive());
+        assertEquals(List.of("NONE", "DAILY", "WEEKLY", "MONTHLY"), response.getItems().stream().map(item -> item.getRecurrenceType()).toList());
+        assertEquals(0L, response.getItems().get(0).getCount());
+        assertEquals(3L, response.getItems().get(1).getCount());
+        assertEquals(0L, response.getItems().get(2).getCount());
+        assertEquals(2L, response.getItems().get(3).getCount());
     }
 
     /**

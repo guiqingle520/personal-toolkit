@@ -4,6 +4,7 @@ import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoReminderItemResponse;
 import com.personal.toolkit.todo.dto.TodoReminderQueryRequest;
+import com.personal.toolkit.todo.dto.TodoReminderSummaryResponse;
 import com.personal.toolkit.todo.dto.TodoReminderStatsResponse;
 import com.personal.toolkit.todo.entity.TodoItem;
 import com.personal.toolkit.todo.entity.TodoReminderEvent;
@@ -195,6 +196,40 @@ public class TodoReminderService {
     @Transactional(readOnly = true)
     public TodoReminderStatsResponse getReminderStats() {
         return new TodoReminderStatsResponse(countUnreadReminders(currentUserProvider.getCurrentUserId()));
+    }
+
+    /**
+     * 返回当前用户更完整的提醒摘要统计信息。
+     *
+     * @return 提醒摘要统计数据
+     */
+    @Transactional(readOnly = true)
+    public TodoReminderSummaryResponse getReminderSummary() {
+        Long userId = currentUserProvider.getCurrentUserId();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfToday = now.toLocalDate().atTime(23, 59, 59);
+
+        try {
+            long unreadCount = todoReminderEventRepository.countByUserIdAndStatus(userId, TodoReminderEvent.STATUS_SENT);
+            long readTodayCount = todoReminderEventRepository.countByUserIdAndStatusAndReadAtBetween(
+                    userId,
+                    TodoReminderEvent.STATUS_READ,
+                    startOfToday,
+                    endOfToday
+            );
+            long scheduledCount = todoReminderEventRepository.countByUserIdAndStatus(userId, TodoReminderEvent.STATUS_PENDING);
+            long overdueReminderCount = todoReminderEventRepository.countByUserIdAndStatusAndScheduledAtLessThan(
+                    userId,
+                    TodoReminderEvent.STATUS_PENDING,
+                    now
+            );
+
+            return new TodoReminderSummaryResponse(unreadCount, readTodayCount, scheduledCount, overdueReminderCount);
+        } catch (InvalidDataAccessResourceUsageException ex) {
+            logMissingReminderTable("querying reminder summary for user " + userId);
+            return new TodoReminderSummaryResponse(0, 0, 0, 0);
+        }
     }
 
     /**
