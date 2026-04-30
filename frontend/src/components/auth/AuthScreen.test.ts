@@ -122,6 +122,43 @@ describe('AuthScreen', () => {
     expect(labels).toContain('Email')
   })
 
+  it('shows a fallback message when captcha loading fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/auth/login-policy')) {
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'ok',
+          data: {
+            captchaEnabled: true,
+            adaptiveCaptcha: false,
+            adaptiveTriggerThreshold: 2,
+          },
+          timestamp: '2026-04-15T00:00:00Z',
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'Internal server error',
+        status: 500,
+        timestamp: '2026-04-15T00:00:00Z',
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }))
+
+    const wrapper = mountWithI18n(AuthScreen)
+    await flushUi()
+
+    expect(wrapper.find('.captcha-image').exists()).toBe(false)
+    expect(wrapper.find('.captcha-placeholder').text()).toContain('Failed to load captcha')
+  })
+
   it('keeps the auth screen mounted under a light theme', async () => {
     setTheme('light')
 

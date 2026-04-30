@@ -67,7 +67,7 @@ function toggleOptionsPanel() {
         <button
           type="button"
           class="btn btn-outline workbench-menu-button"
-          :class="{ 'is-active': routeName === 'tasks' && viewMode === 'ACTIVE' }"
+          :class="{ 'is-active is-active--route': routeName === 'tasks' && viewMode === 'ACTIVE' }"
           :aria-pressed="routeName === 'tasks' && viewMode === 'ACTIVE'"
           @click="activateTasks('ACTIVE')"
         >
@@ -76,7 +76,7 @@ function toggleOptionsPanel() {
         <button
           type="button"
           class="btn btn-outline workbench-menu-button"
-          :class="{ 'is-active': routeName === 'tasks' && viewMode === 'RECYCLE_BIN' }"
+          :class="{ 'is-active is-active--route': routeName === 'tasks' && viewMode === 'RECYCLE_BIN' }"
           :aria-pressed="routeName === 'tasks' && viewMode === 'RECYCLE_BIN'"
           @click="activateTasks('RECYCLE_BIN')"
         >
@@ -91,7 +91,7 @@ function toggleOptionsPanel() {
         <button
           type="button"
           class="btn btn-outline workbench-menu-button"
-          :class="{ 'is-active': routeName === 'statistics' }"
+          :class="{ 'is-active is-active--route': routeName === 'statistics' }"
           :aria-pressed="routeName === 'statistics'"
           @click="openStatistics"
         >
@@ -106,7 +106,7 @@ function toggleOptionsPanel() {
         <button
           type="button"
           class="btn btn-outline workbench-menu-button"
-          :class="{ 'is-active': routeName === 'tasks' && displayMode === 'LIST' }"
+          :class="{ 'is-active is-active--view': routeName === 'tasks' && displayMode === 'LIST' }"
           :aria-pressed="routeName === 'tasks' && displayMode === 'LIST'"
           @click="activateDisplay('LIST')"
         >
@@ -115,7 +115,7 @@ function toggleOptionsPanel() {
         <button
           type="button"
           class="btn btn-outline workbench-menu-button"
-          :class="{ 'is-active': routeName === 'tasks' && displayMode === 'KANBAN' }"
+          :class="{ 'is-active is-active--view': routeName === 'tasks' && displayMode === 'KANBAN' }"
           :aria-pressed="routeName === 'tasks' && displayMode === 'KANBAN'"
           :disabled="routeName === 'tasks' && viewMode !== 'ACTIVE'"
           @click="activateDisplay('KANBAN')"
@@ -125,7 +125,7 @@ function toggleOptionsPanel() {
         <button
           type="button"
           class="btn btn-outline workbench-menu-button"
-          :class="{ 'is-active': routeName === 'tasks' && displayMode === 'CALENDAR' }"
+          :class="{ 'is-active is-active--view': routeName === 'tasks' && displayMode === 'CALENDAR' }"
           :aria-pressed="routeName === 'tasks' && displayMode === 'CALENDAR'"
           :disabled="routeName === 'tasks' && viewMode !== 'ACTIVE'"
           @click="activateDisplay('CALENDAR')"
@@ -141,7 +141,7 @@ function toggleOptionsPanel() {
         <button
           type="button"
           class="btn btn-outline workbench-menu-button"
-          :class="{ 'is-active': routeName === 'tasks' && showOptionsPanel }"
+          :class="{ 'is-active is-active--setting': routeName === 'tasks' && showOptionsPanel }"
           :aria-pressed="routeName === 'tasks' && showOptionsPanel"
           @click="toggleOptionsPanel"
         >

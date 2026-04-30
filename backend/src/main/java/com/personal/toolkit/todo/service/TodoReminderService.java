@@ -175,7 +175,7 @@ public class TodoReminderService {
         List<Long> todoIds = reminderPage.getContent().stream()
                 .map(TodoReminderEvent::getTodoId)
                 .distinct()
-                .toList();
+                .collect(Collectors.toList());
         Map<Long, TodoItem> todoById = todoIds.isEmpty()
                 ? Map.of()
                 : todoRepository.findAllByUserIdAndIdIn(userId, todoIds).stream()
@@ -183,7 +183,7 @@ public class TodoReminderService {
 
         List<TodoReminderItemResponse> items = reminderPage.getContent().stream()
                 .map(event -> toReminderItemResponse(event, todoById.get(event.getTodoId())))
-                .toList();
+                .collect(Collectors.toList());
 
         return PageResponse.from(new PageImpl<>(items, pageable, reminderPage.getTotalElements()));
     }

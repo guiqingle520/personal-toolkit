@@ -13,6 +13,7 @@ const password = ref('')
 const captchaId = ref('')
 const captchaCode = ref('')
 const captchaImage = ref('')
+const captchaLoadError = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
@@ -30,6 +31,7 @@ async function loadLoginPolicy() {
     showCaptcha.value = captchaEnabled.value && !adaptiveCaptcha.value
 
     if (showCaptcha.value) {
+      captchaLoadError.value = ''
       await loadCaptcha()
       return
     }
@@ -37,6 +39,7 @@ async function loadLoginPolicy() {
     captchaId.value = ''
     captchaImage.value = ''
     captchaCode.value = ''
+    captchaLoadError.value = ''
   } catch {
     captchaEnabled.value = false
     adaptiveCaptcha.value = false
@@ -45,6 +48,7 @@ async function loadLoginPolicy() {
     captchaId.value = ''
     captchaImage.value = ''
     captchaCode.value = ''
+    captchaLoadError.value = ''
   }
 }
 
@@ -58,9 +62,11 @@ async function loadCaptcha() {
     captchaId.value = res.data?.captchaId ?? ''
     captchaImage.value = res.data?.image ?? ''
     captchaCode.value = ''
+    captchaLoadError.value = captchaImage.value ? '' : t('auth.captchaLoadFailed')
   } catch {
     captchaId.value = ''
     captchaImage.value = ''
+    captchaLoadError.value = t('auth.captchaLoadFailed')
   }
 }
 
@@ -162,15 +168,16 @@ if (isLogin.value) {
 
         <div class="form-group" v-if="isLogin && showCaptcha">
           <label for="captcha">{{ $t('auth.captcha') }}</label>
-          <div class="captcha-row">
-            <img
-              v-if="captchaImage"
+           <div class="captcha-row">
+             <img
+               v-if="captchaImage"
               :src="captchaImage"
               :alt="$t('auth.captcha')"
               class="captcha-image"
-            />
-            <button type="button" class="btn btn-ghost btn-sm" @click="loadCaptcha">{{ $t('auth.refreshCaptcha') }}</button>
-          </div>
+             />
+             <span v-else class="captcha-placeholder">{{ captchaLoadError || $t('app.syncing') }}</span>
+             <button type="button" class="btn btn-ghost btn-sm" @click="loadCaptcha">{{ $t('auth.refreshCaptcha') }}</button>
+           </div>
           <input
             id="captcha"
             v-model="captchaCode"
@@ -258,6 +265,18 @@ if (isLogin.value) {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.2);
+}
+.captcha-placeholder {
+  min-width: 120px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 0.85rem;
 }
 .auth-submit {
   margin-top: 8px;

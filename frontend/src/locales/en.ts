@@ -104,7 +104,6 @@ const en = {
   },
   status: {
     PENDING: 'Pending',
-    IN_PROGRESS: 'In Progress',
     DONE: 'Done',
     initiating: 'Initiating neuro-link...',
     empty: 'No tasks found. The grid is quiet.',
@@ -236,6 +235,7 @@ const en = {
     email: 'Email',
     captcha: 'Captcha',
     captchaPlaceholder: 'Enter captcha',
+    captchaLoadFailed: 'Failed to load captcha. Please refresh.',
     refreshCaptcha: 'Refresh Captcha',
     loginBtn: 'Login',
     registerBtn: 'Register',

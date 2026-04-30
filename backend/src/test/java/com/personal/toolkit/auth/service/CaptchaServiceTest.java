@@ -17,12 +17,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * 验证验证码服务的核心行为：可签发验证码、错误答案会失败。
@@ -54,6 +56,17 @@ class CaptchaServiceTest {
         assertTrue(response.getExpiresInSeconds() > 0);
 
         verify(valueOperations).set(anyString(), any(Map.class), any());
+    }
+
+    @Test
+    void issueCaptchaShouldFallbackWhenRedisWriteFails() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        doThrow(new RuntimeException("redis down")).when(valueOperations).set(anyString(), any(Map.class), any());
+
+        CaptchaResponse response = assertDoesNotThrow(() -> captchaService.issueCaptcha("127.0.0.1"));
+
+        assertNotNull(response.getCaptchaId());
+        assertTrue(response.getImage().startsWith("data:image/svg+xml;base64,"));
     }
 
     @Test

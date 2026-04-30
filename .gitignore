@@ -4,3 +4,12 @@ frontend/node_modules/
 frontend/dist/
 .idea/
 rebel.xml
+.playwright-mcp/
+backend/.settings/
+playwright-auth-after-login.txt
+playwright-auth-before-submit.txt
+playwright-network-initial.txt
+playwright-stats-network.txt
+playwright-todos-before-create.txt
+backend/.classpath
+backend/.project

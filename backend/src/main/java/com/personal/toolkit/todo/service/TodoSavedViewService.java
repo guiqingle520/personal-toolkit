@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 处理 Todo 已保存筛选视图的 CRUD 和默认视图管理。
@@ -57,7 +58,7 @@ public class TodoSavedViewService {
     public List<TodoSavedViewResponse> listSavedViews() {
         return todoSavedViewRepository.findByUserIdOrderByCreateTimeAsc(currentUserProvider.getCurrentUserId()).stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     @Transactional

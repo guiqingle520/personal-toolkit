@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 /**
  * 处理子任务 checklist 的新增、更新、删除与进度汇总逻辑。
@@ -55,7 +56,7 @@ public class TodoSubItemService {
         return todoSubItemRepository.findAllByTodoIdOrderBySortOrderAscIdAsc(todoId)
                 .stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**

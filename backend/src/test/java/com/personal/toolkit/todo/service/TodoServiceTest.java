@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -391,7 +392,7 @@ class TodoServiceTest {
         TodoStatsRecurrenceDistributionResponse response = todoService.getRecurrenceDistributionStats();
 
         assertEquals(10L, response.getTotalActive());
-        assertEquals(List.of("NONE", "DAILY", "WEEKLY", "MONTHLY"), response.getItems().stream().map(item -> item.getRecurrenceType()).toList());
+        assertEquals(List.of("NONE", "DAILY", "WEEKLY", "MONTHLY"), response.getItems().stream().map(item -> item.getRecurrenceType()).collect(Collectors.toList()));
         assertEquals(0L, response.getItems().get(0).getCount());
         assertEquals(3L, response.getItems().get(1).getCount());
         assertEquals(0L, response.getItems().get(2).getCount());
@@ -412,7 +413,7 @@ class TodoServiceTest {
         TodoStatsRecurrenceDistributionResponse response = todoService.getRecurrenceDistributionStats();
 
         assertEquals(10L, response.getTotalActive());
-        assertEquals(List.of("NONE", "DAILY", "WEEKLY", "MONTHLY"), response.getItems().stream().map(item -> item.getRecurrenceType()).toList());
+        assertEquals(List.of("NONE", "DAILY", "WEEKLY", "MONTHLY"), response.getItems().stream().map(item -> item.getRecurrenceType()).collect(Collectors.toList()));
         assertEquals(4L, response.getItems().get(0).getCount());
         assertEquals(1L, response.getItems().get(1).getCount());
         assertEquals(0L, response.getItems().get(2).getCount());

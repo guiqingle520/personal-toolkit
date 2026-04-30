@@ -14,10 +14,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.springframework.util.StringUtils.hasText;
@@ -40,6 +43,8 @@ public class CaptchaService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final CaptchaProperties captchaProperties;
     private final SecureRandom secureRandom = new SecureRandom();
+    private final Map<String, CaptchaCacheEntry> fallbackCaptchaStore = new ConcurrentHashMap<>();
+    private final Map<String, CounterCacheEntry> fallbackCounterStore = new ConcurrentHashMap<>();
 
     public CaptchaService(RedisTemplate<String, Object> redisTemplate,
                           CaptchaProperties captchaProperties) {
@@ -68,7 +73,7 @@ public class CaptchaService {
                 "attemptsLeft", captchaProperties.getMaxAttempts()
         );
 
-        redisTemplate.opsForValue().set(captchaRedisKey(captchaId), payload, captchaProperties.getTtl());
+        storeCaptchaPayload(captchaId, payload, captchaProperties.getTtl());
         log.info("Issued login captcha captchaId={} clientIp={} ttlSeconds={}", captchaId, clientIp, captchaProperties.getTtl().toSeconds());
 
         String svg = buildCaptchaSvg(answer);
@@ -115,7 +120,7 @@ public class CaptchaService {
      */
     public void validateCaptcha(String captchaId, String captchaCode) {
         String redisKey = captchaRedisKey(captchaId);
-        Object cached = redisTemplate.opsForValue().get(redisKey);
+        Object cached = readCaptchaPayload(redisKey);
         if (!(cached instanceof Map<?, ?> map)) {
             log.warn("Rejected login captcha because it was missing or expired captchaId={}", captchaId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha expired or invalid");
@@ -138,19 +143,19 @@ public class CaptchaService {
                     "attemptsLeft", nextAttemptsLeft
             );
 
-            Long ttlSeconds = redisTemplate.getExpire(redisKey, TimeUnit.SECONDS);
+            Long ttlSeconds = readCaptchaTtlSeconds(redisKey);
             if (ttlSeconds == null || ttlSeconds <= 0) {
-                redisTemplate.delete(redisKey);
+                deleteCaptchaPayload(redisKey);
                 log.warn("Rejected login captcha because remaining TTL was invalid captchaId={}", captchaId);
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha expired or invalid");
             }
 
-            redisTemplate.opsForValue().set(redisKey, nextPayload, Duration.ofSeconds(ttlSeconds));
+            storeCaptchaPayload(captchaId, nextPayload, Duration.ofSeconds(ttlSeconds));
             log.warn("Rejected login captcha due to answer mismatch captchaId={} attemptsLeft={}", captchaId, nextAttemptsLeft);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Captcha verification failed");
         }
 
-        redisTemplate.delete(redisKey);
+        deleteCaptchaPayload(redisKey);
         log.info("Accepted login captcha captchaId={}", captchaId);
     }
 
@@ -224,19 +229,131 @@ public class CaptchaService {
      * @param loginIdentifier 登录标识
      */
     public void clearLoginFailure(String clientIp, String loginIdentifier) {
-        redisTemplate.delete(loginFailIdKey(normalizeIdentifier(loginIdentifier)));
+        deleteCounter(loginFailIdKey(normalizeIdentifier(loginIdentifier)));
         log.info("Cleared identifier login failure counter after successful login clientIp={} identifier={}", clientIp, normalizeIdentifier(loginIdentifier));
     }
 
     private void incrementWithTtl(String key) {
-        Long current = redisTemplate.opsForValue().increment(key);
-        if (current != null && current == 1L) {
-            redisTemplate.expire(key, captchaProperties.getLoginFailWindow());
+        try {
+            Long current = redisTemplate.opsForValue().increment(key);
+            if (current != null && current == 1L) {
+                redisTemplate.expire(key, captchaProperties.getLoginFailWindow());
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Redis unavailable while incrementing captcha/login counter key={}, falling back to in-memory store", key, ex);
+            incrementFallbackCounter(key, captchaProperties.getLoginFailWindow());
         }
     }
 
     private long readFailCount(String key) {
-        Object value = redisTemplate.opsForValue().get(key);
+        try {
+            Object value = redisTemplate.opsForValue().get(key);
+            long redisValue = asLong(value);
+            if (redisValue > 0L) {
+                return redisValue;
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Redis unavailable while reading captcha/login counter key={}, falling back to in-memory store", key, ex);
+        }
+
+        CounterCacheEntry fallbackEntry = fallbackCounterStore.get(key);
+        if (fallbackEntry == null) {
+            return 0L;
+        }
+
+        if (fallbackEntry.isExpired()) {
+            fallbackCounterStore.remove(key);
+            return 0L;
+        }
+
+        return fallbackEntry.count();
+    }
+
+    private void storeCaptchaPayload(String captchaId, Map<String, Object> payload, Duration ttl) {
+        String redisKey = captchaRedisKey(captchaId);
+        try {
+            redisTemplate.opsForValue().set(redisKey, payload, ttl);
+        } catch (RuntimeException ex) {
+            log.warn("Redis unavailable while storing captcha {}, falling back to in-memory store", captchaId, ex);
+            fallbackCaptchaStore.put(redisKey, new CaptchaCacheEntry(new HashMap<>(payload), Instant.now().plus(ttl)));
+        }
+    }
+
+    private Object readCaptchaPayload(String redisKey) {
+        try {
+            Object cached = redisTemplate.opsForValue().get(redisKey);
+            if (cached != null) {
+                return cached;
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Redis unavailable while reading captcha payload key={}, falling back to in-memory store", redisKey, ex);
+        }
+
+        CaptchaCacheEntry fallbackEntry = fallbackCaptchaStore.get(redisKey);
+        if (fallbackEntry == null) {
+            return null;
+        }
+
+        if (fallbackEntry.isExpired()) {
+            fallbackCaptchaStore.remove(redisKey);
+            return null;
+        }
+
+        return fallbackEntry.payload();
+    }
+
+    private Long readCaptchaTtlSeconds(String redisKey) {
+        try {
+            Long ttlSeconds = redisTemplate.getExpire(redisKey, TimeUnit.SECONDS);
+            if (ttlSeconds != null && ttlSeconds > 0) {
+                return ttlSeconds;
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Redis unavailable while reading captcha TTL key={}, falling back to in-memory store", redisKey, ex);
+        }
+
+        CaptchaCacheEntry fallbackEntry = fallbackCaptchaStore.get(redisKey);
+        if (fallbackEntry == null) {
+            return null;
+        }
+
+        if (fallbackEntry.isExpired()) {
+            fallbackCaptchaStore.remove(redisKey);
+            return null;
+        }
+
+        return Math.max(1L, Duration.between(Instant.now(), fallbackEntry.expiresAt()).getSeconds());
+    }
+
+    private void deleteCaptchaPayload(String redisKey) {
+        try {
+            redisTemplate.delete(redisKey);
+        } catch (RuntimeException ex) {
+            log.warn("Redis unavailable while deleting captcha payload key={}, falling back to in-memory store", redisKey, ex);
+        }
+        fallbackCaptchaStore.remove(redisKey);
+    }
+
+    private void incrementFallbackCounter(String key, Duration ttl) {
+        CounterCacheEntry current = fallbackCounterStore.get(key);
+        if (current == null || current.isExpired()) {
+            fallbackCounterStore.put(key, new CounterCacheEntry(1L, Instant.now().plus(ttl)));
+            return;
+        }
+
+        fallbackCounterStore.put(key, new CounterCacheEntry(current.count() + 1L, current.expiresAt()));
+    }
+
+    private void deleteCounter(String key) {
+        try {
+            redisTemplate.delete(key);
+        } catch (RuntimeException ex) {
+            log.warn("Redis unavailable while deleting captcha/login counter key={}, falling back to in-memory store", key, ex);
+        }
+        fallbackCounterStore.remove(key);
+    }
+
+    private long asLong(Object value) {
         if (value instanceof Number number) {
             return number.longValue();
         }
@@ -344,5 +461,17 @@ public class CaptchaService {
 
         svg.append("</svg>");
         return svg.toString();
+    }
+
+    private record CaptchaCacheEntry(Map<String, Object> payload, Instant expiresAt) {
+        private boolean isExpired() {
+            return expiresAt.isBefore(Instant.now());
+        }
+    }
+
+    private record CounterCacheEntry(long count, Instant expiresAt) {
+        private boolean isExpired() {
+            return expiresAt.isBefore(Instant.now());
+        }
     }
 }

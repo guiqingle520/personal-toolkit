@@ -236,7 +236,7 @@ public class TodoService {
                         row[0] == null ? null : ((Number) row[0]).intValue(),
                         row[1] == null ? 0L : ((Number) row[1]).longValue()
                 ))
-                .toList();
+                .collect(Collectors.toList());
 
         return new TodoStatsPriorityDistributionResponse(items, totalActive);
     }
@@ -333,7 +333,7 @@ public class TodoService {
 
         List<TodoStatsRecurrenceDistributionItemResponse> items = List.of("NONE", "DAILY", "WEEKLY", "MONTHLY").stream()
                 .map(type -> new TodoStatsRecurrenceDistributionItemResponse(type, countByType.getOrDefault(type, 0L)))
-                .toList();
+                .collect(Collectors.toList());
 
         return new TodoStatsRecurrenceDistributionResponse(items, totalActive);
     }
@@ -735,7 +735,7 @@ public class TodoService {
                 .map(this::buildNextRecurringTodo)
                 .filter(java.util.Objects::nonNull)
                 .filter(nextTodo -> !hasMatchingRecurringSuccessor(nextTodo))
-                .toList();
+                .collect(Collectors.toList());
 
         if (nextRecurringTodos.isEmpty()) {
             return List.of();
@@ -984,7 +984,7 @@ public class TodoService {
             return;
         }
 
-        List<Long> todoIds = todoItems.stream().map(TodoItem::getId).toList();
+        List<Long> todoIds = todoItems.stream().map(TodoItem::getId).collect(Collectors.toList());
         Map<Long, TodoSubItemSummaryResponse> summaryMap = buildSummaryMap(todoIds);
         todoItems.forEach(todoItem -> todoItem.setSubItemSummary(
                 summaryMap.getOrDefault(todoItem.getId(), new TodoSubItemSummaryResponse(0, 0, 0))

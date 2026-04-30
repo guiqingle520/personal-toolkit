@@ -104,7 +104,6 @@ const zhCN = {
   },
   status: {
     PENDING: '待办',
-    IN_PROGRESS: '进行中',
     DONE: '已完成',
     initiating: '正在初始化神经连接...',
     empty: '未找到任务。网格很安静。',
@@ -236,6 +235,7 @@ const zhCN = {
     email: '邮箱',
     captcha: '验证码',
     captchaPlaceholder: '输入验证码',
+    captchaLoadFailed: '验证码加载失败，请刷新重试',
     refreshCaptcha: '刷新验证码',
     loginBtn: '登录',
     registerBtn: '注册',
