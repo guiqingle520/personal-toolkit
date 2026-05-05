@@ -198,61 +198,66 @@ onMounted(() => {
 </script>
 
 <template>
-  <TodoWorkbenchLayout>
-    <template #header>
-      <TodoWorkbenchHeader :title="t('app.statistics')">
-        <template #actions>
-          <button
-            type="button"
-            class="btn btn-outline"
-            data-testid="statistics-refresh-button"
-            :disabled="loading"
-            @click="loadStats"
-          >
-            <span class="icon">↻</span>
-            {{ loading ? t('app.syncing') : t('app.refresh') }}
-          </button>
+  <section class="todo-panel">
+    <div class="glass-bg"></div>
+    <div class="content-wrapper">
+      <TodoWorkbenchLayout>
+        <template #header>
+          <TodoWorkbenchHeader :title="t('app.statistics')">
+            <template #actions>
+              <button
+                type="button"
+                class="btn btn-outline"
+                data-testid="statistics-refresh-button"
+                :disabled="loading"
+                @click="loadStats"
+              >
+                <span class="icon">↻</span>
+                {{ loading ? t('app.syncing') : t('app.refresh') }}
+              </button>
+            </template>
+          </TodoWorkbenchHeader>
         </template>
-      </TodoWorkbenchHeader>
-    </template>
 
-    <template #menu>
-      <TodoSidebarNav
-        route-name="statistics"
-        @navigate:statistics="handleNavigateStatistics"
-        @navigate:tasks="handleNavigateTasks"
-      />
-    </template>
+        <template #menu>
+          <TodoSidebarNav
+            route-name="statistics"
+            @navigate:statistics="handleNavigateStatistics"
+            @navigate:tasks="handleNavigateTasks"
+          />
+        </template>
 
-    <div class="statistics-page-content" data-testid="statistics-page-content">
-      <div v-if="errorMessage" class="error-banner">
-        <strong>{{ t('status.error') }}</strong> {{ errorMessage }}
-      </div>
+        <div class="statistics-page-content" data-testid="statistics-page-content">
+          <div v-if="errorMessage" class="error-banner">
+            <strong>{{ t('status.error') }}</strong> {{ errorMessage }}
+          </div>
 
-      <div v-else-if="loading && !overview" class="state-message">
-        {{ t('app.syncing') }}
-      </div>
+          <div v-else-if="loading && !overview" class="state-message">
+            {{ t('app.syncing') }}
+          </div>
 
-      <TodoStatsPanel
-        v-else
-        :overview="overview"
-        :categories="categories"
-        :trend="trend"
-        :trend-summary="trendSummary"
-        :due-buckets="dueBuckets"
-        :priority-distribution="priorityDistribution"
-        :aging="aging"
-        :reminder-summary="reminderSummary"
-        :recurrence-distribution="recurrenceDistribution"
-        :trend-range="trendRange"
-        page-mode
-        @update:trend-range="handleTrendRangeUpdate"
-        @click:due="handleDueClick"
-        @click:priority="handlePriorityClick"
-        @click:recurrence="handleRecurrenceClick"
-      />
+          <TodoStatsPanel
+            v-else
+            :overview="overview"
+            :categories="categories"
+            :trend="trend"
+            :trend-summary="trendSummary"
+            :due-buckets="dueBuckets"
+            :priority-distribution="priorityDistribution"
+            :aging="aging"
+            :reminder-summary="reminderSummary"
+            :recurrence-distribution="recurrenceDistribution"
+            :trend-range="trendRange"
+            page-mode
+            @update:trend-range="handleTrendRangeUpdate"
+            @click:due="handleDueClick"
+            @click:priority="handlePriorityClick"
+            @click:recurrence="handleRecurrenceClick"
+          />
+        </div>
+      </TodoWorkbenchLayout>
     </div>
-  </TodoWorkbenchLayout>
+  </section>
 </template>
 
 <style scoped>

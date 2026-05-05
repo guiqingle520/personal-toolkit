@@ -576,6 +576,9 @@ onUnmounted(() => {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
+  color-scheme: inherit;
+  background-color: var(--color-surface-input, rgba(255, 255, 255, 0.03));
+  color: var(--color-text-bright, #e4e4e7);
 }
 
 .date-input-display {
@@ -656,7 +659,7 @@ onUnmounted(() => {
   width: 296px;
   padding: 16px;
   box-sizing: border-box;
-  background-color: #0f172a;
+  background-color: var(--color-select-option-bg, #0f172a);
   border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-md, 8px);
   box-shadow: var(--shadow-panel, 0 24px 64px rgba(0, 0, 0, 0.4));
@@ -734,7 +737,8 @@ onUnmounted(() => {
 }
 
 .day-cell.is-outside {
-  color: rgba(161, 161, 170, 0.45);
+  color: var(--color-text-normal, #a1a1aa);
+  opacity: 0.45;
 }
 
 .day-cell.is-disabled {
