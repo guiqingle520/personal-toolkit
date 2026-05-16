@@ -121,12 +121,13 @@ function createSuccessResponse(data: unknown) {
   }
 }
 
-async function mountTodoList(route = '/tasks') {
+async function mountTodoList(route = '/tasks', options: { attachTo?: HTMLElement } = {}) {
   const router = createAppRouter(createMemoryHistory())
   await router.push(route)
   await router.isReady()
 
   const wrapper = mount(TodoList, {
+    attachTo: options.attachTo,
     global: {
       plugins: [i18n, router],
       stubs: { Teleport: true },
@@ -249,6 +250,13 @@ describe('TodoList route-aware workbench', () => {
     expect(router.currentRoute.value.query.options).toBe('1')
   })
 
+  it('restores the options panel when opening tasks route with options query', async () => {
+    const { wrapper, router } = await mountTodoList('/tasks?options=1')
+
+    expect(wrapper.findComponent({ name: 'TodoOptionsPanel' }).props('show')).toBe(true)
+    expect(router.currentRoute.value.query.options).toBe('1')
+  })
+
   it('syncs display-related filters into router query', async () => {
     const { wrapper, router } = await mountTodoList()
 
@@ -315,12 +323,16 @@ describe('TodoList route-aware workbench', () => {
 
   it('shows recovery action when created todo is hidden by active filters', async () => {
     const { wrapper } = await mountTodoList()
+
+    const statusSelect = wrapper.find('.filter-section select')
+    await statusSelect.setValue('DONE')
+    await flushPromises()
+
+    await wrapper.find('.list-actions-bar button').trigger('click')
     const createRows = wrapper.findAll('.create-form .create-row')
     const titleInput = createRows[0].find('input[type="text"]')
-    const statusSelect = wrapper.find('.filter-section select')
     const addButton = createRows[1].find('button.btn-primary')
 
-    await statusSelect.setValue('DONE')
     await titleInput.setValue('Hidden todo')
     await addButton.trigger('click')
     await flushPromises()
@@ -335,6 +347,7 @@ describe('TodoList route-aware workbench', () => {
 
   it('prevents submitting reminder date later than due date', async () => {
     const { wrapper } = await mountTodoList()
+    await wrapper.find('.list-actions-bar button').trigger('click')
     const createRows = wrapper.findAll('.create-form .create-row')
     const titleInput = createRows[0].find('input[type="text"]')
     const dueDateInput = createRows[1].find('.localized-date-input-wrapper input')
@@ -364,6 +377,181 @@ describe('TodoList route-aware workbench', () => {
       status: 'DONE',
       keyword: 'retro',
     })
+  })
+
+  it('opens and closes the create modal via button and close button', async () => {
+    const { wrapper } = await mountTodoList()
+    
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(false)
+    
+    await wrapper.find('.list-actions-bar button').trigger('click')
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(true)
+    
+    await wrapper.find('.todo-create-modal .modal-close').trigger('click')
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(false)
+  })
+
+  it('closes the create modal with escape and restores focus to the trigger', async () => {
+    const { wrapper } = await mountTodoList('/tasks', { attachTo: document.body })
+
+    const trigger = wrapper.find('.list-actions-bar button')
+    const focusSpy = vi.spyOn(trigger.element as HTMLButtonElement, 'focus')
+    await trigger.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(true)
+
+    await wrapper.find('.todo-create-modal').trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(false)
+    expect(focusSpy).toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('keeps focus trapped inside the create modal when tabbing past the last focusable element', async () => {
+    const { wrapper } = await mountTodoList('/tasks', { attachTo: document.body })
+
+    await wrapper.find('.list-actions-bar button').trigger('click')
+    await flushPromises()
+
+    const focusableElements = wrapper.findAll('.todo-create-modal input, .todo-create-modal select, .todo-create-modal textarea, .todo-create-modal button')
+    const firstElement = focusableElements[0]?.element as HTMLElement
+    const lastElement = focusableElements[focusableElements.length - 1]?.element as HTMLElement
+
+    lastElement.focus()
+    await wrapper.find('.todo-create-modal').trigger('keydown', { key: 'Tab' })
+    expect(document.activeElement).toBe(firstElement)
+
+    firstElement.focus()
+    await wrapper.find('.todo-create-modal').trigger('keydown', { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(lastElement)
+
+    wrapper.unmount()
+  })
+
+  it('focuses the title field when the create modal opens', async () => {
+    const { wrapper } = await mountTodoList('/tasks', { attachTo: document.body })
+
+    await wrapper.find('.list-actions-bar button').trigger('click')
+    await flushPromises()
+
+    const titleInput = wrapper.find('.todo-create-modal input[type="text"]')
+    expect(document.activeElement).toBe(titleInput.element)
+
+    wrapper.unmount()
+  })
+
+  it('does not force-close the create modal with escape while submitting', async () => {
+    let resolveCreateRequest: (() => void) | null = null
+    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.includes('/api/todos') && options?.method === 'POST') {
+        await new Promise<void>((resolve) => {
+          resolveCreateRequest = resolve
+        })
+        return { ok: true, json: async () => createSuccessResponse({ id: 2, title: 'Pending create' }) }
+      }
+
+      return createFetchImplementation()(url, options)
+    })
+
+    const { wrapper } = await mountTodoList('/tasks', { attachTo: document.body })
+
+    await wrapper.find('.list-actions-bar button').trigger('click')
+    await wrapper.find('.todo-create-modal input[type="text"]').setValue('Pending create')
+    await wrapper.find('.todo-create-modal .btn.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.submitting).toBe(true)
+
+    await wrapper.find('.todo-create-modal').trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(true)
+
+    resolveCreateRequest?.()
+    await flushPromises()
+    await flushPromises()
+
+    wrapper.unmount()
+  })
+
+  it('does not close the create modal from backdrop click while submitting', async () => {
+    let resolveCreateRequest: (() => void) | null = null
+    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.includes('/api/todos') && options?.method === 'POST') {
+        await new Promise<void>((resolve) => {
+          resolveCreateRequest = resolve
+        })
+        return { ok: true, json: async () => createSuccessResponse({ id: 2, title: 'Pending create' }) }
+      }
+
+      return createFetchImplementation()(url, options)
+    })
+
+    const { wrapper } = await mountTodoList('/tasks', { attachTo: document.body })
+
+    await wrapper.find('.list-actions-bar button').trigger('click')
+    await wrapper.find('.todo-create-modal input[type="text"]').setValue('Pending create')
+    await wrapper.find('.todo-create-modal .btn.btn-primary').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('.todo-create-modal-overlay').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(true)
+
+    resolveCreateRequest?.()
+    await flushPromises()
+    await flushPromises()
+
+    wrapper.unmount()
+  })
+
+  it('keeps modal open and shows inline error feedback when create request fails', async () => {
+    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.includes('/api/todos') && options?.method === 'POST') {
+        return {
+          ok: false,
+          json: async () => ({
+            success: false,
+            message: 'Create failed in modal',
+            timestamp: '2026-04-07T00:00:00',
+            validation: {
+              title: ['Title already exists'],
+            },
+          }),
+        }
+      }
+
+      return createFetchImplementation()(url, options)
+    })
+
+    const { wrapper } = await mountTodoList()
+
+    await wrapper.find('.list-actions-bar button').trigger('click')
+    const titleInput = wrapper.find('.todo-create-modal input[type="text"]')
+    await titleInput.setValue('Broken create modal')
+    await wrapper.find('.todo-create-modal .btn.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(true)
+    expect(wrapper.find('.todo-create-modal .error-banner-inline').text()).toContain('Create failed in modal')
+    expect((wrapper.find('.todo-create-modal input[type="text"]').element as HTMLInputElement).value).toBe('Broken create modal')
+  })
+
+  it('closes modal and clears draft after successful create', async () => {
+    const { wrapper } = await mountTodoList()
+
+    await wrapper.find('.list-actions-bar button').trigger('click')
+    await wrapper.find('.todo-create-modal input[type="text"]').setValue('Ship modal create')
+    await wrapper.find('.todo-create-modal .btn.btn-primary').trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.vm.isCreateModalOpen).toBe(false)
+    expect(wrapper.find('.todo-create-modal').exists()).toBe(false)
+    expect(wrapper.vm.newTodo.title).toBe('')
   })
 
   it('syncs document lang when locale changes so native date inputs can follow app locale', () => {

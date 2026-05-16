@@ -4,6 +4,7 @@ export interface User {
   id: number
   username: string
   email?: string
+  passwordChangeRequired?: boolean
 }
 
 const TOKEN_STORAGE_KEY = 'personal-toolkit-auth-token'
@@ -17,7 +18,8 @@ function readStoredUser(): User | null {
 
   try {
     return JSON.parse(rawUser) as User
-  } catch {
+  } catch (parseError) {
+    void parseError
     globalThis.localStorage?.removeItem(USER_STORAGE_KEY)
     return null
   }

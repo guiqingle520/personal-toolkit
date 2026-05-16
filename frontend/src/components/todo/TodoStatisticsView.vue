@@ -198,11 +198,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="todo-panel">
-    <div class="glass-bg"></div>
-    <div class="content-wrapper">
-      <TodoWorkbenchLayout>
-        <template #header>
+  <TodoWorkbenchLayout>
+    <template #header>
           <TodoWorkbenchHeader :title="t('app.statistics')">
             <template #actions>
               <button
@@ -256,8 +253,6 @@ onMounted(() => {
           />
         </div>
       </TodoWorkbenchLayout>
-    </div>
-  </section>
 </template>
 
 <style scoped>

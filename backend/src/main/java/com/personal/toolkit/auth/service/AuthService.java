@@ -1,6 +1,7 @@
 package com.personal.toolkit.auth.service;
 
 import com.personal.toolkit.auth.dto.AuthLoginRequest;
+import com.personal.toolkit.auth.dto.AuthChangePasswordRequest;
 import com.personal.toolkit.auth.dto.AuthRegisterRequest;
 import com.personal.toolkit.auth.dto.AuthTokenResponse;
 import com.personal.toolkit.auth.dto.UserProfileResponse;
@@ -9,6 +10,7 @@ import com.personal.toolkit.auth.repository.AppUserRepository;
 import com.personal.toolkit.auth.security.AppUserPrincipal;
 import com.personal.toolkit.auth.security.CurrentUserProvider;
 import com.personal.toolkit.auth.security.JwtTokenService;
+import com.personal.toolkit.common.exception.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Locale;
+import java.time.LocalDateTime;
 
 /**
  * 处理注册、登录和当前用户查询逻辑，为前端提供无状态 JWT 鉴权能力。
@@ -32,17 +35,20 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenService jwtTokenService;
     private final CurrentUserProvider currentUserProvider;
+    private final PasswordPolicyService passwordPolicyService;
 
     public AuthService(AppUserRepository appUserRepository,
                        PasswordEncoder passwordEncoder,
                        AuthenticationManager authenticationManager,
                        JwtTokenService jwtTokenService,
-                       CurrentUserProvider currentUserProvider) {
+                       CurrentUserProvider currentUserProvider,
+                       PasswordPolicyService passwordPolicyService) {
         this.appUserRepository = appUserRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtTokenService = jwtTokenService;
         this.currentUserProvider = currentUserProvider;
+        this.passwordPolicyService = passwordPolicyService;
     }
 
     /**
@@ -61,6 +67,8 @@ public class AuthService {
         appUser.setUsername(normalizedUsername);
         appUser.setEmail(normalizedEmail);
         appUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        appUser.setPasswordChangeRequired(false);
+        appUser.setPasswordChangedAt(LocalDateTime.now());
 
         AppUser savedUser = appUserRepository.save(appUser);
         AppUserPrincipal principal = AppUserPrincipal.from(savedUser);
@@ -119,6 +127,35 @@ public class AuthService {
     }
 
     /**
+     * 允许已登录用户在无需服务端会话的前提下完成自助改密，并清除强制改密标记。
+     *
+     * @param request 改密请求体
+     * @return 更新后的当前用户概要信息
+     */
+    @Transactional
+    public UserProfileResponse changePassword(AuthChangePasswordRequest request) {
+        Long userId = currentUserProvider.getCurrentUserId();
+        AppUser appUser = appUserRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), appUser.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+        if (request.getCurrentPassword().equals(request.getNewPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from current password");
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password confirmation does not match");
+        }
+
+        appUser.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        appUser.setPasswordChangedAt(LocalDateTime.now());
+        appUser.setPasswordChangeRequired(false);
+        AppUser savedUser = appUserRepository.save(appUser);
+        return toProfile(savedUser);
+    }
+
+    /**
      * 规范化用户名，统一去除首尾空白并转为原样大小写存储下的比较基准。
      *
      * @param username 原始用户名
@@ -160,6 +197,12 @@ public class AuthService {
      * @return 用户概要响应
      */
     private UserProfileResponse toProfile(AppUser appUser) {
-        return new UserProfileResponse(appUser.getId(), appUser.getUsername(), appUser.getEmail());
+        boolean passwordChangeRequired = passwordPolicyService.isPasswordChangeRequired(appUser);
+        return new UserProfileResponse(
+                appUser.getId(),
+                appUser.getUsername(),
+                appUser.getEmail(),
+                passwordChangeRequired
+        );
     }
 }

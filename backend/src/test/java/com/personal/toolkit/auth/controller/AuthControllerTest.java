@@ -3,6 +3,9 @@ package com.personal.toolkit.auth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personal.toolkit.auth.config.SecurityConfig;
 import com.personal.toolkit.auth.dto.AuthLoginRequest;
+import com.personal.toolkit.auth.dto.AuthChangePasswordRequest;
+import com.personal.toolkit.auth.dto.SecurityPolicyResponse;
+import com.personal.toolkit.auth.dto.SecurityPolicyUpdateRequest;
 import com.personal.toolkit.auth.service.AuthAuditService;
 import com.personal.toolkit.auth.dto.AuthRegisterRequest;
 import com.personal.toolkit.auth.dto.AuthTokenResponse;
@@ -12,8 +15,10 @@ import com.personal.toolkit.auth.security.AppUserDetailsService;
 import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
 import com.personal.toolkit.auth.security.JwtTokenService;
 import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
+import com.personal.toolkit.auth.service.AppSecurityPolicyService;
 import com.personal.toolkit.auth.service.AuthService;
 import com.personal.toolkit.auth.service.CaptchaService;
+import com.personal.toolkit.auth.service.PasswordPolicyService;
 import com.personal.toolkit.common.exception.ApiException;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -34,6 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,7 +68,13 @@ class AuthControllerTest {
     private CaptchaService captchaService;
 
     @MockBean
+    private PasswordPolicyService passwordPolicyService;
+
+    @MockBean
     private AuthAuditService authAuditService;
+
+    @MockBean
+    private AppSecurityPolicyService appSecurityPolicyService;
 
     @MockBean
     private JwtTokenService jwtTokenService;
@@ -186,6 +198,73 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Logout successful"));
     }
 
+    @Test
+    @WithMockUser(username = "alice")
+    void changePasswordShouldReturnUpdatedProfile() throws Exception {
+        AuthChangePasswordRequest request = new AuthChangePasswordRequest();
+        request.setCurrentPassword("old-password");
+        request.setNewPassword("new-password-123");
+        request.setConfirmPassword("new-password-123");
+
+        when(authService.changePassword(any(AuthChangePasswordRequest.class)))
+                .thenReturn(new UserProfileResponse(1L, "alice", "alice@example.com", false));
+
+        mockMvc.perform(post("/api/auth/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password changed successfully"))
+                .andExpect(jsonPath("$.data.passwordChangeRequired").value(false));
+    }
+
+    @Test
+    @WithMockUser(username = "bootstrap")
+    void getSecurityPolicyShouldReturnPolicyPayload() throws Exception {
+        when(appSecurityPolicyService.getPolicyForCurrentUser())
+                .thenReturn(new SecurityPolicyResponse(1800L, 1800L, true, 90));
+
+        mockMvc.perform(get("/api/auth/security-policy"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Security policy fetched successfully"))
+                .andExpect(jsonPath("$.data.accessTokenTtlSeconds").value(1800))
+                .andExpect(jsonPath("$.data.effectiveAccessTokenTtlSeconds").value(1800))
+                .andExpect(jsonPath("$.data.passwordExpiryEnabled").value(true))
+                .andExpect(jsonPath("$.data.passwordExpiryDays").value(90));
+    }
+
+    @Test
+    @WithMockUser(username = "bootstrap")
+    void updateSecurityPolicyShouldReturnUpdatedPolicyPayload() throws Exception {
+        SecurityPolicyUpdateRequest request = new SecurityPolicyUpdateRequest();
+        request.setAccessTokenTtlSeconds(1800L);
+        request.setPasswordExpiryEnabled(true);
+        request.setPasswordExpiryDays(90);
+
+        when(appSecurityPolicyService.updatePolicyForCurrentUser(any(SecurityPolicyUpdateRequest.class)))
+                .thenReturn(new SecurityPolicyResponse(1800L, 1800L, true, 90));
+
+        mockMvc.perform(put("/api/auth/security-policy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Security policy updated successfully"))
+                .andExpect(jsonPath("$.data.passwordExpiryEnabled").value(true));
+    }
+
+    @Test
+    @WithMockUser(username = "alice")
+    void getSecurityPolicyShouldReturnBusinessErrorWhenAccessDenied() throws Exception {
+        when(appSecurityPolicyService.getPolicyForCurrentUser())
+                .thenThrow(new ApiException(org.springframework.http.HttpStatus.FORBIDDEN,
+                        "SECURITY_POLICY_ACCESS_DENIED",
+                        "Security policy access denied"));
+
+        mockMvc.perform(get("/api/auth/security-policy"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SECURITY_POLICY_ACCESS_DENIED"))
+                .andExpect(jsonPath("$.message").value("Security policy access denied"));
+    }
+
     /**
      * 登录业务异常应被转换为统一错误响应结构。
      */
@@ -227,6 +306,6 @@ class AuthControllerTest {
     }
 
     private AuthTokenResponse authTokenResponse() {
-        return new AuthTokenResponse("jwt-token", new UserProfileResponse(1L, "alice", "alice@example.com"));
+        return new AuthTokenResponse("jwt-token", new UserProfileResponse(1L, "alice", "alice@example.com", false));
     }
 }

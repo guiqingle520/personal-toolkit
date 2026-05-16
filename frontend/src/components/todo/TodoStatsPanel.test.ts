@@ -111,6 +111,9 @@ describe('TodoStatsPanel', () => {
 
   it('renders page-mode dashboard sections with stable hooks', () => {
     const wrapper = mountWithLocale('en', true)
+    const trendSection = wrapper.find('[data-testid="stats-trend-section"]')
+    const trendHeading = trendSection.find('h3')
+    const trendRangeSelect = trendSection.find('select')
 
     expect(wrapper.find('[data-testid="page-stats-dashboard"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="stats-kpi-grid"]').exists()).toBe(true)
@@ -124,6 +127,9 @@ describe('TodoStatsPanel', () => {
     expect(wrapper.find('[data-testid="stats-aging-section"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="stats-reminder-section"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="stats-recurrence-section"]').exists()).toBe(true)
+    expect(trendSection.attributes('role')).toBe('region')
+    expect(trendSection.attributes('aria-labelledby')).toBe(trendHeading.attributes('id'))
+    expect(trendRangeSelect.attributes('aria-labelledby')).toBe(trendHeading.attributes('id'))
     
     // Check trend snapshot specific text for English
     expect(wrapper.text()).toContain('Created in shown trend')
@@ -133,6 +139,24 @@ describe('TodoStatsPanel', () => {
     expect(wrapper.text()).toContain('Due Timeline')
     expect(wrapper.text()).toContain('Reminder Summary')
     expect(wrapper.text()).toContain('Recurrence Distribution')
+  })
+
+  it('reuses base trend layout classes in page mode so bars render correctly', () => {
+    const wrapper = mountWithLocale('en', true)
+
+    const chart = wrapper.find('.trend-chart-lg')
+    const day = wrapper.find('[data-testid="stats-trend-bar"]')
+    const bars = wrapper.find('.bars-lg')
+    const createdBar = wrapper.find('.bar-lg.created-bar')
+    const completedBar = wrapper.find('.bar-lg.completed-bar')
+    const label = wrapper.find('.day-label-lg')
+
+    expect(chart.classes()).toContain('trend-chart')
+    expect(day.classes()).toContain('trend-day')
+    expect(bars.classes()).toContain('bars')
+    expect(createdBar.classes()).toContain('bar')
+    expect(completedBar.classes()).toContain('bar')
+    expect(label.classes()).toContain('day-label')
   })
 
   it('sorts category rows deterministically in page mode', () => {
@@ -217,15 +241,15 @@ describe('TodoStatsPanel', () => {
     expect(wrapper.find('.trend-chart-wrapper').classes()).toContain('range-30d')
     expect(wrapper.findAll('[data-testid="stats-trend-bar"]')).toHaveLength(30)
     
-    // For 30d, interval is 5. With 30 items, index 29, 24, 19, 14, 9, 4 -> 6 labels
+    // For 30d, interval is 7. With 30 items, index 29, 22, 15, 8, 1 -> 5 labels
     let labels = wrapper.findAll('.day-label-lg')
     let visibleLabels = labels.filter(l => l.element.style.display !== 'none')
-    expect(visibleLabels.length).toBe(6)
+    expect(visibleLabels.length).toBe(5)
 
     const visibleLabelIndexes30d = labels
       .map((label, index) => label.element.style.display !== 'none' ? index : -1)
       .filter((index) => index >= 0)
-    expect(visibleLabelIndexes30d).toEqual([4, 9, 14, 19, 24, 29])
+    expect(visibleLabelIndexes30d).toEqual([1, 8, 15, 22, 29])
     expect(labels[29]?.element.style.display).not.toBe('none')
 
     await wrapper.setProps({ trendRange: '90d', trend: Array.from({ length: 90 }, (_, index) => ({

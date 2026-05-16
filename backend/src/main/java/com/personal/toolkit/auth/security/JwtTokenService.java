@@ -1,6 +1,7 @@
 package com.personal.toolkit.auth.security;
 
 import com.personal.toolkit.auth.config.JwtProperties;
+import com.personal.toolkit.auth.service.AppSecurityPolicyService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.io.DecodingException;
 import io.jsonwebtoken.JwtException;
@@ -21,10 +22,13 @@ import java.util.Date;
 public class JwtTokenService {
 
     private final JwtProperties jwtProperties;
+    private final AppSecurityPolicyService appSecurityPolicyService;
     private final SecretKey secretKey;
 
-    public JwtTokenService(JwtProperties jwtProperties) {
+    public JwtTokenService(JwtProperties jwtProperties,
+                           AppSecurityPolicyService appSecurityPolicyService) {
         this.jwtProperties = jwtProperties;
+        this.appSecurityPolicyService = appSecurityPolicyService;
         this.secretKey = resolveSigningKey(jwtProperties.getSecret());
     }
 
@@ -36,7 +40,7 @@ public class JwtTokenService {
      */
     public String generateToken(AppUserPrincipal principal) {
         Instant issuedAt = Instant.now();
-        Instant expiresAt = issuedAt.plus(jwtProperties.getExpiration());
+        Instant expiresAt = issuedAt.plus(appSecurityPolicyService.resolveAccessTokenTtl());
         return Jwts.builder()
                 .subject(principal.getUsername())
                 .issuer(jwtProperties.getIssuer())

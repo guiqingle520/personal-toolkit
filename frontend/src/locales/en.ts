@@ -35,7 +35,8 @@ const en = {
     menuLabel: 'Open account menu',
     management: 'Account Management',
     themeSettings: 'Theme Settings',
-    signedInAs: 'Signed in as {value}'
+    signedInAs: 'Signed in as {value}',
+    securitySettings: 'Security Settings'
   },
   options: {
     knownCategories: 'Known Categories',
@@ -244,6 +245,28 @@ const en = {
     hasAccount: 'Already registered?',
     loginLink: 'Login here',
     logout: 'Disconnect'
+  },
+  securitySettings: {
+    title: 'Security Settings',
+    accessTokenTtl: 'Access Token TTL (seconds)',
+    effectiveTtl: 'Effective TTL (seconds)',
+    passwordExpiryEnabled: 'Enable Password Expiry',
+    passwordExpiryDays: 'Password Expiry Days',
+    save: 'Save Settings',
+    ttlNotice: 'Changes to token TTL will only affect newly issued tokens.',
+    success: 'Security policy updated successfully.',
+    unauthorized: 'You do not have permission to access security settings.',
+    error: 'Failed to load security settings.'
+  },
+  changePassword: {
+    title: 'Force Password Change',
+    currentPassword: 'Current Password',
+    newPassword: 'New Password',
+    confirmPassword: 'Confirm New Password',
+    submit: 'Change Password',
+    success: 'Password changed successfully. Returning to workbench...',
+    mismatch: 'New passwords do not match.',
+    error: 'Failed to change password.'
   },
   calendar: {
     today: 'Today',

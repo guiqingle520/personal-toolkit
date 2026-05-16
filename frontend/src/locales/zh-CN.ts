@@ -35,7 +35,8 @@ const zhCN = {
     menuLabel: '打开账号菜单',
     management: '账号管理',
     themeSettings: '主题设置',
-    signedInAs: '当前账号：{value}'
+    signedInAs: '当前账号：{value}',
+    securitySettings: '安全设置'
   },
   options: {
     knownCategories: '已知分类',
@@ -145,8 +146,8 @@ const zhCN = {
     createdTodoHiddenByFilters: '任务已创建，但被当前筛选条件隐藏。你可以重置筛选来查看它。'
   },
   pagination: {
-    prev: '← 上一页',
-    next: '下一页 →',
+    prev: '« 上一页',
+    next: '下一页 »',
     pageInfo: '第 {page} 页，共 {total} 页'
   },
   recurrence: {
@@ -244,6 +245,28 @@ const zhCN = {
     hasAccount: '已注册？',
     loginLink: '在此登录',
     logout: '断开连接'
+  },
+  securitySettings: {
+    title: '安全设置',
+    accessTokenTtl: '访问令牌有效期 (秒)',
+    effectiveTtl: '实际生效有效期 (秒)',
+    passwordExpiryEnabled: '启用密码过期',
+    passwordExpiryDays: '密码过期天数',
+    save: '保存设置',
+    ttlNotice: '令牌有效期的更改仅对新签发的令牌生效。',
+    success: '安全策略更新成功。',
+    unauthorized: '您没有权限访问安全设置。',
+    error: '加载安全设置失败。'
+  },
+  changePassword: {
+    title: '强制修改密码',
+    currentPassword: '当前密码',
+    newPassword: '新密码',
+    confirmPassword: '确认新密码',
+    submit: '修改密码',
+    success: '密码修改成功，正在返回工作台...',
+    mismatch: '新密码不一致。',
+    error: '修改密码失败。'
   },
   calendar: {
     today: '今天',

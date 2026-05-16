@@ -8,14 +8,20 @@ public class UserProfileResponse {
     private Long id;
     private String username;
     private String email;
+    private boolean passwordChangeRequired;
 
     public UserProfileResponse() {
     }
 
     public UserProfileResponse(Long id, String username, String email) {
+        this(id, username, email, false);
+    }
+
+    public UserProfileResponse(Long id, String username, String email, boolean passwordChangeRequired) {
         this.id = id;
         this.username = username;
         this.email = email;
+        this.passwordChangeRequired = passwordChangeRequired;
     }
 
     /**
@@ -70,5 +76,23 @@ public class UserProfileResponse {
      */
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    /**
+     * 返回当前用户是否需要修改密码。
+     *
+     * @return 是否需要修改密码
+     */
+    public boolean isPasswordChangeRequired() {
+        return passwordChangeRequired;
+    }
+
+    /**
+     * 设置当前用户是否需要修改密码。
+     *
+     * @param passwordChangeRequired 是否需要修改密码
+     */
+    public void setPasswordChangeRequired(boolean passwordChangeRequired) {
+        this.passwordChangeRequired = passwordChangeRequired;
     }
 }

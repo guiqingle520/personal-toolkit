@@ -1,6 +1,12 @@
 package com.personal.toolkit.auth.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.personal.toolkit.auth.entity.AppUser;
+import com.personal.toolkit.auth.service.PasswordPolicyService;
+import com.personal.toolkit.common.api.ApiErrorResponse;
+import com.personal.toolkit.common.exception.ApiException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,14 +27,19 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String CHANGE_PASSWORD_PATH = "/api/auth/change-password";
+    private static final String LOGOUT_PATH = "/api/auth/logout";
 
     private final JwtTokenService jwtTokenService;
-    private final AppUserDetailsService appUserDetailsService;
+    private final PasswordPolicyService passwordPolicyService;
+    private final ObjectMapper objectMapper;
 
     public JwtAuthenticationFilter(JwtTokenService jwtTokenService,
-                                   AppUserDetailsService appUserDetailsService) {
+                                   PasswordPolicyService passwordPolicyService,
+                                   ObjectMapper objectMapper) {
         this.jwtTokenService = jwtTokenService;
-        this.appUserDetailsService = appUserDetailsService;
+        this.passwordPolicyService = passwordPolicyService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -51,13 +62,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
-        if (!jwtTokenService.isValid(token) || SecurityContextHolder.getContext().getAuthentication() != null) {
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        Claims claims = jwtTokenService.parseToken(token);
-        AppUserPrincipal principal = (AppUserPrincipal) appUserDetailsService.loadUserByUsername(claims.getSubject());
+        Claims claims;
+        try {
+            claims = jwtTokenService.parseToken(token);
+        } catch (JwtException | IllegalArgumentException ex) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        AppUser appUser = passwordPolicyService.findUserForClaims(claims).orElse(null);
+        if (appUser == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        java.util.Optional<ApiException> policyViolation = passwordPolicyService.resolvePasswordPolicyViolation(appUser);
+        if (policyViolation.isPresent() && !isPasswordPolicyBypassPath(request)) {
+            writePolicyErrorResponse(request, response, policyViolation.get());
+            return;
+        }
+
+        AppUserPrincipal principal = AppUserPrincipal.from(appUser);
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 principal,
                 null,
@@ -66,5 +96,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPasswordPolicyBypassPath(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        return CHANGE_PASSWORD_PATH.equals(requestUri) || LOGOUT_PATH.equals(requestUri);
+    }
+
+    private void writePolicyErrorResponse(HttpServletRequest request,
+                                          HttpServletResponse response,
+                                          ApiException exception) throws IOException {
+        response.setStatus(exception.getStatusCode().value());
+        response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getWriter(), ApiErrorResponse.of(
+                exception.getCode(),
+                exception.getMessage(),
+                exception.getStatusCode().value(),
+                request.getRequestURI()
+        ));
     }
 }

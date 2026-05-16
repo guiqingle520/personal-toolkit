@@ -47,6 +47,11 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const sectionIdPrefix = `todo-stats-${Math.random().toString(36).slice(2, 8)}`
+
+function sectionHeadingId(sectionKey: string) {
+  return `${sectionIdPrefix}-${sectionKey}-title`
+}
 
 const displayCategories = computed(() => {
   return props.categories.map((categoryItem) => ({
@@ -81,7 +86,7 @@ const dashboardTrend = computed(() => {
   if (range === '90d' || len > 31) {
     interval = 14
   } else if (range === '30d' || len > 14) {
-    interval = 5
+    interval = 7
   }
   
   return baseTrend.map((day, i) => {
@@ -130,12 +135,13 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
 
     <div class="dashboard-main-grid">
       <div class="dashboard-col-main">
-        <div class="dashboard-card trend-section" data-testid="stats-trend-section">
+        <div class="dashboard-card trend-section" data-testid="stats-trend-section" role="region" :aria-labelledby="sectionHeadingId('trend')">
           <div class="trend-header">
-            <h3>{{ t('stats.trendTitle') }}</h3>
+            <h3 :id="sectionHeadingId('trend')">{{ t('stats.trendTitle') }}</h3>
             <select
               class="trend-range-select"
               :value="trendRange || '7d'"
+              :aria-labelledby="sectionHeadingId('trend')"
               @change="emit('update:trendRange', ($event.target as HTMLSelectElement).value)"
             >
               <option value="7d">{{ t('stats.trend7d') }}</option>
@@ -145,40 +151,40 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
           </div>
           <div v-if="!dashboardTrend.length" class="empty-stats">{{ t('stats.empty') }}</div>
           <div v-else class="trend-chart-wrapper" :class="`range-${trendRange || '7d'}`">
-            <div class="trend-chart-lg">
+            <div class="trend-chart trend-chart-lg">
               <div
                 v-for="day in dashboardTrend"
                 :key="day.date"
-                class="trend-day-lg"
+                class="trend-day trend-day-lg"
               data-testid="stats-trend-bar"
               :data-date="day.date"
               :data-peak="day.isPeak ? '1' : '0'"
             >
-              <div class="bars-lg">
-                <div
-                  class="bar-lg created-bar"
-                  :style="{ height: maxTrendValue ? `${(day.createdCount / maxTrendValue) * 100}%` : '0' }"
-                  :title="t('stats.createdOnlyLabel', { count: day.createdCount })"
-                >
-                  <span v-if="day.createdCount > 0" class="bar-value text-muted">{{ day.createdCount }}</span>
-                </div>
-                <div
-                  class="bar-lg completed-bar"
-                  :class="{ 'is-peak': day.isPeak }"
-                  :style="{ height: maxTrendValue ? `${(day.completedCount / maxTrendValue) * 100}%` : '0' }"
-                  :title="t('stats.completedOnlyLabel', { count: day.completedCount })"
-                >
-                  <span v-if="day.completedCount > 0" class="bar-value">{{ day.completedCount }}</span>
-                </div>
-              </div>
-              <div class="day-label-lg" v-show="day.showLabel">{{ day.label }}</div>
-            </div>
-          </div>
-        </div>
+               <div class="bars bars-lg">
+                 <div
+                   class="bar bar-lg created-bar"
+                   :style="{ height: maxTrendValue ? `${(day.createdCount / maxTrendValue) * 100}%` : '0' }"
+                   :title="t('stats.createdOnlyLabel', { count: day.createdCount })"
+                 >
+                   <span v-if="day.createdCount > 0" class="bar-value text-muted">{{ day.createdCount }}</span>
+                 </div>
+                 <div
+                   class="bar bar-lg completed-bar"
+                   :class="{ 'is-peak': day.isPeak }"
+                   :style="{ height: maxTrendValue ? `${(day.completedCount / maxTrendValue) * 100}%` : '0' }"
+                   :title="t('stats.completedOnlyLabel', { count: day.completedCount })"
+                 >
+                   <span v-if="day.completedCount > 0" class="bar-value">{{ day.completedCount }}</span>
+                 </div>
+               </div>
+               <div class="day-label day-label-lg" v-show="day.showLabel">{{ day.label }}</div>
+             </div>
+           </div>
+         </div>
         </div>
 
-        <div class="dashboard-card snapshot-section" data-testid="stats-trend-snapshot">
-          <h3>{{ t('stats.snapshotTitle') }}</h3>
+        <div class="dashboard-card snapshot-section" data-testid="stats-trend-snapshot" role="region" :aria-labelledby="sectionHeadingId('snapshot')">
+          <h3 :id="sectionHeadingId('snapshot')">{{ t('stats.snapshotTitle') }}</h3>
           <div class="snapshot-grid">
             <div class="snapshot-item" data-testid="stats-snapshot-item" data-snapshot-key="trendTotalCreated">
               <span class="snapshot-label">{{ t('stats.trendTotalCreated') }}</span>
@@ -216,8 +222,8 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
           </div>
         </div>
 
-        <div v-if="dashboardReminderSummary.length" class="dashboard-card reminder-summary-section" data-testid="stats-reminder-section">
-          <h3>{{ t('stats.reminderSummaryTitle') }}</h3>
+        <div v-if="dashboardReminderSummary.length" class="dashboard-card reminder-summary-section" data-testid="stats-reminder-section" role="region" :aria-labelledby="sectionHeadingId('reminder')">
+          <h3 :id="sectionHeadingId('reminder')">{{ t('stats.reminderSummaryTitle') }}</h3>
           <div class="snapshot-grid">
             <div v-for="item in dashboardReminderSummary" :key="item.key" class="snapshot-item">
               <span class="snapshot-label">{{ t(`stats.${item.key}`) }}</span>
@@ -228,8 +234,8 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
       </div>
 
       <div class="dashboard-col-side">
-        <div v-if="dashboardAging.length" class="dashboard-card aging-section" data-testid="stats-aging-section">
-          <h3>{{ t('stats.agingDistribution') }}</h3>
+        <div v-if="dashboardAging.length" class="dashboard-card aging-section" data-testid="stats-aging-section" role="region" :aria-labelledby="sectionHeadingId('aging')">
+          <h3 :id="sectionHeadingId('aging')">{{ t('stats.agingDistribution') }}</h3>
           <ul class="dist-list">
             <li v-for="bucket in dashboardAging" :key="bucket.label" class="dist-item">
               <div class="dist-header">
@@ -243,69 +249,79 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
           </ul>
         </div>
 
-        <div v-if="dashboardDueBuckets.length" class="dashboard-card due-section" data-testid="stats-due-section">
-          <h3>{{ t('stats.dueBuckets') }}</h3>
+        <div v-if="dashboardDueBuckets.length" class="dashboard-card due-section" data-testid="stats-due-section" role="region" :aria-labelledby="sectionHeadingId('due')">
+          <h3 :id="sectionHeadingId('due')">{{ t('stats.dueBuckets') }}</h3>
           <ul class="dist-list">
             <li
               v-for="bucket in dashboardDueBuckets"
               :key="bucket.key"
-              class="dist-item"
-              :class="{ clickable: bucket.key !== 'bucketNoDate' }"
-              @click="bucket.key !== 'bucketNoDate' && emit('click:due', bucket.key)"
             >
-              <div class="dist-header">
-                <span class="dist-name">{{ t(`stats.${bucket.key}`) }}</span>
-                <span class="dist-count" :class="bucket.toneClass">{{ bucket.count }}</span>
-              </div>
-              <div class="dist-progress-bar">
-                <div class="dist-progress-fill" :class="bucket.toneClass" :style="{ width: `${bucket.percentage}%` }"></div>
-              </div>
+              <component
+                :is="bucket.key !== 'bucketNoDate' ? 'button' : 'div'"
+                class="dist-item"
+                :class="{ clickable: bucket.key !== 'bucketNoDate' }"
+                @click="bucket.key !== 'bucketNoDate' && emit('click:due', bucket.key)"
+              >
+                <div class="dist-header">
+                  <span class="dist-name">{{ t(`stats.${bucket.key}`) }}</span>
+                  <span class="dist-count" :class="bucket.toneClass">{{ bucket.count }}</span>
+                </div>
+                <div class="dist-progress-bar">
+                  <div class="dist-progress-fill" :class="bucket.toneClass" :style="{ width: `${bucket.percentage}%` }"></div>
+                </div>
+              </component>
             </li>
           </ul>
         </div>
 
-        <div v-if="dashboardPriorityDist.length" class="dashboard-card priority-section" data-testid="stats-priority-section">
-          <h3>{{ t('stats.priorityDist') }}</h3>
+        <div v-if="dashboardPriorityDist.length" class="dashboard-card priority-section" data-testid="stats-priority-section" role="region" :aria-labelledby="sectionHeadingId('priority')">
+          <h3 :id="sectionHeadingId('priority')">{{ t('stats.priorityDist') }}</h3>
           <ul class="dist-list">
             <li
               v-for="p in dashboardPriorityDist"
               :key="p.priority"
-              class="dist-item clickable"
-              @click="emit('click:priority', p.priority)"
             >
-              <div class="dist-header">
-                <span class="dist-name">{{ p.labelKey.includes('.') ? t(p.labelKey) : t(`stats.${p.labelKey}`) }}</span>
-                <span class="dist-count" :class="p.toneClass">{{ p.count }}</span>
-              </div>
-              <div class="dist-progress-bar">
-                <div class="dist-progress-fill" :class="p.toneClass" :style="{ width: `${p.percentage}%` }"></div>
-              </div>
+              <button
+                class="dist-item clickable"
+                @click="emit('click:priority', p.priority)"
+              >
+                <div class="dist-header">
+                  <span class="dist-name">{{ p.labelKey.includes('.') ? t(p.labelKey) : t(`stats.${p.labelKey}`) }}</span>
+                  <span class="dist-count" :class="p.toneClass">{{ p.count }}</span>
+                </div>
+                <div class="dist-progress-bar">
+                  <div class="dist-progress-fill" :class="p.toneClass" :style="{ width: `${p.percentage}%` }"></div>
+                </div>
+              </button>
             </li>
           </ul>
         </div>
 
-        <div v-if="dashboardRecurrence.length" class="dashboard-card recurrence-section" data-testid="stats-recurrence-section">
-          <h3>{{ t('stats.recurrenceDistribution') }}</h3>
+        <div v-if="dashboardRecurrence.length" class="dashboard-card recurrence-section" data-testid="stats-recurrence-section" role="region" :aria-labelledby="sectionHeadingId('recurrence')">
+          <h3 :id="sectionHeadingId('recurrence')">{{ t('stats.recurrenceDistribution') }}</h3>
           <ul class="dist-list">
             <li
               v-for="item in dashboardRecurrence"
               :key="item.recurrenceType"
-              class="dist-item clickable"
-              @click="emit('click:recurrence', item.recurrenceType)"
             >
-              <div class="dist-header">
-                <span class="dist-name">{{ t(item.labelKey) }}</span>
-                <span class="dist-count">{{ item.count }}</span>
-              </div>
-              <div class="dist-progress-bar">
-                <div class="dist-progress-fill text-primary" :style="{ width: `${item.percentage}%` }"></div>
-              </div>
+              <button
+                class="dist-item clickable"
+                @click="emit('click:recurrence', item.recurrenceType)"
+              >
+                <div class="dist-header">
+                  <span class="dist-name">{{ t(item.labelKey) }}</span>
+                  <span class="dist-count">{{ item.count }}</span>
+                </div>
+                <div class="dist-progress-bar">
+                  <div class="dist-progress-fill text-primary" :style="{ width: `${item.percentage}%` }"></div>
+                </div>
+              </button>
             </li>
           </ul>
         </div>
 
-        <div class="dashboard-card category-section" data-testid="stats-categories-section">
-          <h3>{{ t('stats.categoryStats') }}</h3>
+        <div class="dashboard-card category-section" data-testid="stats-categories-section" role="region" :aria-labelledby="sectionHeadingId('categories')">
+          <h3 :id="sectionHeadingId('categories')">{{ t('stats.categoryStats') }}</h3>
           <div v-if="!dashboardCategories.length" class="empty-stats">{{ t('stats.empty') }}</div>
           <ul v-else class="category-dist-list">
             <li
@@ -410,67 +426,115 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
 <style scoped>
 .todo-stats-panel {
   margin-bottom: 0;
-  padding: 18px;
-  background: var(--bg-surface, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-md, 8px);
+  padding: 24px;
+  background: rgba(12, 12, 12, 0.7);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  border-radius: var(--radius-lg, 12px);
+  backdrop-filter: blur(8px);
+}
+
+.todo-dashboard-page {
+  padding: 32px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .stats-panel-title {
-  margin-bottom: 1rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-bright, #fff);
+  margin-bottom: 1.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-primary);
+  text-transform: uppercase;
 }
 
 .stats-overview {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .stat-box {
   min-width: 0;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: var(--radius-sm, 4px);
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md, 8px);
   text-align: left;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-box::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  opacity: 0.1;
+  transition: opacity 0.3s ease;
+}
+
+.stat-box:hover {
+  transform: translateY(-2px);
+  background: rgba(15, 15, 15, 0.6);
+  border-color: rgba(212, 175, 55, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.stat-box:hover::after {
+  opacity: 0.5;
 }
 
 .stat-label {
-  font-size: 0.78rem;
-  color: var(--text-muted, #aaa);
-  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted, #999);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .stat-value {
-  font-size: 1.25rem;
-  font-weight: bold;
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
-.text-success { color: var(--success-color, #10b981); }
-.text-warning { color: var(--warning-color, #f59e0b); }
-.text-primary { color: var(--primary-color, #3b82f6); }
-.text-info { color: var(--accent-color, #38bdf8); }
+.text-success { color: var(--color-success, #10b981); text-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
+.text-warning { color: var(--color-warning, #f59e0b); text-shadow: 0 0 10px rgba(245, 158, 11, 0.2); }
+.text-primary { color: var(--color-primary, #d4af37); text-shadow: 0 0 10px rgba(212, 175, 55, 0.2); }
+.text-info { color: var(--color-info, #d4af37); text-shadow: 0 0 10px rgba(212, 175, 55, 0.2); }
 
 .stats-row {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 20px;
 }
 
 .stats-card {
   flex: 1;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 14px;
-  border-radius: var(--radius-sm, 4px);
+  background: rgba(5, 5, 5, 0.5);
+  padding: 20px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .stats-card h3 {
-  margin: 0 0 0.9rem 0;
-  font-size: 0.95rem;
-  color: var(--text-muted, #aaa);
+  margin: 0 0 1.2rem 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-bright, #fff);
+  letter-spacing: 0.01em;
 }
 
 .dist-list {
@@ -479,16 +543,25 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .dist-item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 4px;
-  border-radius: var(--radius-sm, 4px);
-  transition: background-color 0.2s ease;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 6px);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+button.dist-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
 }
 
 .dist-item.clickable {
@@ -497,61 +570,75 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
 
 .dist-item.clickable:hover {
   background: rgba(255, 255, 255, 0.05);
+  transform: translateX(4px);
 }
 
 .trend-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 1rem;
-  margin-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  padding-bottom: 1.2rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .trend-header h3 {
   margin: 0;
+  font-size: 1.05rem;
 }
 
 .trend-range-select {
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--text-bright, #fff);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--color-primary);
+  border: 1px solid rgba(212, 175, 55, 0.3);
   border-radius: var(--radius-sm, 4px);
-  padding: 2px 8px;
+  padding: 4px 12px;
   font-size: 0.85rem;
+  font-weight: 500;
   outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.trend-range-select:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.2);
 }
 
 .dist-header {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .dist-name {
-  color: var(--text-bright, #fff);
+  color: var(--color-text-bright, #fff);
+  font-weight: 500;
 }
 
 .dist-count {
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .dist-progress-bar {
-  height: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
   overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .dist-progress-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 2px;
+  box-shadow: 0 0 8px currentColor;
 }
 
-.dist-progress-fill.text-warning { background: var(--warning-color, #f59e0b); }
-.dist-progress-fill.text-primary { background: var(--primary-color, #3b82f6); }
-.dist-progress-fill.text-info { background: var(--accent-color, #38bdf8); }
-.dist-progress-fill.text-muted { background: var(--text-muted, #aaa); }
+.dist-progress-fill.text-warning { background: var(--color-warning, #f59e0b); }
+.dist-progress-fill.text-primary { background: var(--color-primary, #d4af37); }
+.dist-progress-fill.text-info { background: var(--color-info, #d4af37); }
+.dist-progress-fill.text-muted { background: var(--text-muted, #888); box-shadow: none; }
 
 .category-list {
   list-style: none;
@@ -563,42 +650,50 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 0.9rem;
 }
 
 .category-list li:last-child {
   border-bottom: none;
 }
 
+.cat-name {
+  font-weight: 500;
+}
+
 .category-summary {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 .cat-count {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.1rem 0.5rem;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.2rem 0.6rem;
   border-radius: 12px;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .cat-count.active {
-  color: var(--warning-color, #f59e0b);
+  color: var(--color-primary, #d4af37);
+  border-color: rgba(212, 175, 55, 0.2);
 }
 
 .cat-count.completed {
-  color: var(--success-color, #10b981);
+  color: var(--color-success, #10b981);
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .trend-chart {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
-  height: 120px;
-  padding-bottom: 20px;
+  height: 140px;
+  padding-bottom: 24px;
   position: relative;
 }
 
@@ -613,103 +708,315 @@ const dashboardRecurrence = computed(() => props.recurrenceDistribution ? buildD
 
 .trend-value {
   font-size: 0.75rem;
-  color: var(--text-muted, #aaa);
-  margin-bottom: 6px;
+  color: var(--color-text-bright, #fff);
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
 .bars {
   display: flex;
-  height: 100px;
+  height: 120px;
   width: 100%;
   align-items: flex-end;
   justify-content: center;
 }
 
 .bar {
-  width: 8px;
+  width: 10px;
   min-height: 2px;
-  border-radius: 2px 2px 0 0;
-  transition: height 0.3s ease;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .created-bar {
-  background: rgba(255, 255, 255, 0.2);
-  margin-right: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-right: 4px;
 }
 
 .completed-bar {
-  background: var(--success-color, #10b981);
+  background: linear-gradient(180deg, var(--color-primary), rgba(212, 175, 55, 0.4));
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.2);
 }
 
 .day-label {
   position: absolute;
-  bottom: -20px;
-  font-size: 0.7rem;
-  color: var(--text-muted, #aaa);
+  bottom: -24px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #777);
   white-space: nowrap;
 }
 
 .empty-stats {
-  color: var(--text-muted, #aaa);
+  color: var(--text-muted, #666);
   font-style: italic;
   text-align: center;
-  padding: 1rem 0;
+  padding: 2rem 0;
+  font-size: 0.9rem;
 }
 
 .trend-chart-wrapper {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 8px;
-  /* Add top padding to prevent tooltip clipping when bar is at 100% height */
-  padding-top: 32px;
+  padding-bottom: 12px;
+  padding-top: 40px;
 }
 
 .trend-chart-wrapper::-webkit-scrollbar {
-  height: 6px;
+  height: 4px;
 }
 .trend-chart-wrapper::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
 }
 .trend-chart-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 2px;
 }
 .trend-chart-wrapper::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(212, 175, 55, 0.6);
 }
 
 .trend-chart-wrapper .trend-chart-lg {
-  min-width: max-content; /* Ensure items do not shrink below their base size */
+  min-width: max-content;
 }
 
 .trend-chart-wrapper .trend-day-lg {
-  flex: 1 0 auto; /* Prevent bars from squishing to 0 width */
+  flex: 1 0 auto;
 }
 
-/* 30 days */
-.trend-chart-wrapper.range-30d .trend-chart-lg {
-  gap: 8px;
-}
-.trend-chart-wrapper.range-30d .trend-day-lg {
-  min-width: 32px;
-}
-.trend-chart-wrapper.range-30d .bar-lg {
-  width: 14px;
+/* Page Mode Specifics */
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
 }
 
-/* 90 days */
-.trend-chart-wrapper.range-90d .trend-chart-lg {
+.kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: rgba(12, 12, 12, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary);
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(212, 175, 55, 0.2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.kpi-card:hover::before {
+  opacity: 1;
+}
+
+.kpi-icon {
+  font-size: 2rem;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+.kpi-info {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
-.trend-chart-wrapper.range-90d .trend-day-lg {
-  min-width: 16px;
+
+.kpi-label {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
 }
-.trend-chart-wrapper.range-90d .bar-lg {
-  width: 6px;
+
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
-.trend-chart-wrapper.range-90d .day-label-lg {
-  font-size: 0.65rem;
+
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
 }
+
+.dashboard-col-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-col-side {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-card {
+  background: rgba(12, 12, 12, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+}
+
+.dashboard-card h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-primary);
+  text-transform: uppercase;
+}
+
+.snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 20px;
+}
+
+.snapshot-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.snapshot-label {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.snapshot-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.snapshot-value--compact {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.snapshot-value--compact small {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  opacity: 0.8;
+}
+
+.category-dist-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.category-dist-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  transition: transform 0.2s ease;
+}
+
+.category-dist-item:hover {
+  transform: translateX(4px);
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.cat-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.cat-rank {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  opacity: 0.8;
+}
+
+.cat-name-lg {
+  flex: 1;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--color-text-bright, #fff);
+}
+
+.cat-total {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-bright, #fff);
+}
+
+.cat-progress-bar {
+  height: 6px;
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.cat-progress-fill {
+  height: 100%;
+}
+
+.cat-progress-fill--completed {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.5), var(--color-success));
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.cat-progress-fill--active {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.4), var(--color-primary));
+}
+
+.cat-details {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cat-count-sm {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cat-count-sm.active { color: var(--color-primary); border-color: rgba(212, 175, 55, 0.2); }
+.cat-count-sm.completed { color: var(--color-success); border-color: rgba(16, 185, 129, 0.2); }
+.cat-count-sm.share { color: var(--text-muted, #888); }
 </style>

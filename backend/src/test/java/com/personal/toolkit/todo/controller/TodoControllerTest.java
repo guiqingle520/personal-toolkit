@@ -6,6 +6,7 @@ import com.personal.toolkit.auth.security.AppUserDetailsService;
 import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
 import com.personal.toolkit.auth.security.JwtTokenService;
 import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
+import com.personal.toolkit.auth.service.PasswordPolicyService;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoBatchRequest;
@@ -84,6 +85,9 @@ class TodoControllerTest {
 
     @MockBean
     private AppUserDetailsService appUserDetailsService;
+
+    @MockBean
+    private PasswordPolicyService passwordPolicyService;
 
     /**
      * 未认证访问 Todo 资源时应返回统一 401 错误响应，避免暴露默认登录页。

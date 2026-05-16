@@ -10,12 +10,12 @@ describe('useAuth', () => {
 
   it('sets session and stores token and user in localStorage', () => {
     const { token, user, setSession } = useAuth()
-    setSession('dummy-token', { id: 7, username: 'alice', email: 'alice@example.com' })
+    setSession('dummy-token', { id: 7, username: 'alice', email: 'alice@example.com', passwordChangeRequired: true })
 
     expect(token.value).toBe('dummy-token')
-    expect(user.value).toEqual({ id: 7, username: 'alice', email: 'alice@example.com' })
+    expect(user.value).toEqual({ id: 7, username: 'alice', email: 'alice@example.com', passwordChangeRequired: true })
     expect(localStorage.getItem('personal-toolkit-auth-token')).toBe('dummy-token')
-    expect(localStorage.getItem('personal-toolkit-auth-user')).toBe(JSON.stringify({ id: 7, username: 'alice', email: 'alice@example.com' }))
+    expect(localStorage.getItem('personal-toolkit-auth-user')).toBe(JSON.stringify({ id: 7, username: 'alice', email: 'alice@example.com', passwordChangeRequired: true }))
   })
 
   it('clears token from state and localStorage', () => {

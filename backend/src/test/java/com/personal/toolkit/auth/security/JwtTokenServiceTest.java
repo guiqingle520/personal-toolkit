@@ -1,6 +1,7 @@
 package com.personal.toolkit.auth.security;
 
 import com.personal.toolkit.auth.config.JwtProperties;
+import com.personal.toolkit.auth.service.AppSecurityPolicyService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -8,6 +9,8 @@ import java.time.Duration;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证 JwtTokenService 在不同密钥配置下的启动行为，避免明文密钥被误判为非法 Base64 后直接导致服务启动失败。
@@ -20,8 +23,10 @@ class JwtTokenServiceTest {
     @Test
     void shouldAcceptPlainTextSecretWhenBase64DecodingFails() {
         JwtProperties properties = createProperties("change-me-change-me-change-me-change-me-change-me-1234567890");
+        AppSecurityPolicyService appSecurityPolicyService = mock(AppSecurityPolicyService.class);
+        when(appSecurityPolicyService.resolveAccessTokenTtl()).thenReturn(Duration.ofHours(12));
 
-        assertDoesNotThrow(() -> new JwtTokenService(properties));
+        assertDoesNotThrow(() -> new JwtTokenService(properties, appSecurityPolicyService));
     }
 
     /**
@@ -30,8 +35,10 @@ class JwtTokenServiceTest {
     @Test
     void shouldRejectTooShortPlainTextSecret() {
         JwtProperties properties = createProperties("short-secret");
+        AppSecurityPolicyService appSecurityPolicyService = mock(AppSecurityPolicyService.class);
+        when(appSecurityPolicyService.resolveAccessTokenTtl()).thenReturn(Duration.ofHours(12));
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new JwtTokenService(properties));
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new JwtTokenService(properties, appSecurityPolicyService));
 
         assertEquals("JWT secret must be at least 32 bytes when provided as plain text or decoded from Base64", exception.getMessage());
     }
@@ -42,9 +49,26 @@ class JwtTokenServiceTest {
     @Test
     void shouldFallbackToDefaultSecretWhenConfiguredSecretIsBlank() {
         JwtProperties properties = createProperties("   ");
+        AppSecurityPolicyService appSecurityPolicyService = mock(AppSecurityPolicyService.class);
+        when(appSecurityPolicyService.resolveAccessTokenTtl()).thenReturn(Duration.ofHours(12));
 
-        assertDoesNotThrow(() -> new JwtTokenService(properties));
+        assertDoesNotThrow(() -> new JwtTokenService(properties, appSecurityPolicyService));
         assertEquals(JwtProperties.DEFAULT_SECRET, properties.getSecret());
+    }
+
+    @Test
+    void shouldUseRuntimePolicyTtlWhenGeneratingToken() {
+        JwtProperties properties = createProperties(JwtProperties.DEFAULT_SECRET);
+        AppSecurityPolicyService appSecurityPolicyService = mock(AppSecurityPolicyService.class);
+        when(appSecurityPolicyService.resolveAccessTokenTtl()).thenReturn(Duration.ofMinutes(30));
+        JwtTokenService jwtTokenService = new JwtTokenService(properties, appSecurityPolicyService);
+        AppUserPrincipal principal = new AppUserPrincipal(1L, "alice", "alice@example.com", "encoded-password");
+
+        String token = jwtTokenService.generateToken(principal);
+
+        var claims = jwtTokenService.parseToken(token);
+        long ttlSeconds = claims.getExpiration().toInstant().getEpochSecond() - claims.getIssuedAt().toInstant().getEpochSecond();
+        assertEquals(1800L, ttlSeconds);
     }
 
     private JwtProperties createProperties(String secret) {

@@ -26,7 +26,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties({JwtProperties.class, CaptchaProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, CaptchaProperties.class, SecurityPolicyBootstrapProperties.class})
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;

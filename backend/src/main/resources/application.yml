@@ -62,3 +62,5 @@ app:
       issue-window: ${APP_AUTH_CAPTCHA_ISSUE_WINDOW:PT1M}
       login-fail-threshold: ${APP_AUTH_CAPTCHA_LOGIN_FAIL_THRESHOLD:5}
       login-fail-window: ${APP_AUTH_CAPTCHA_LOGIN_FAIL_WINDOW:PT15M}
+    security-policy:
+      bootstrap-allowlist: ${APP_AUTH_SECURITY_POLICY_BOOTSTRAP_ALLOWLIST:}

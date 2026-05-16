@@ -5,6 +5,7 @@ import com.personal.toolkit.auth.security.AppUserDetailsService;
 import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
 import com.personal.toolkit.auth.security.JwtTokenService;
 import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
+import com.personal.toolkit.auth.service.PasswordPolicyService;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import com.personal.toolkit.todo.dto.PageResponse;
 import com.personal.toolkit.todo.dto.TodoReminderItemResponse;
@@ -54,6 +55,9 @@ class TodoReminderControllerTest {
 
     @MockBean
     private AppUserDetailsService appUserDetailsService;
+
+    @MockBean
+    private PasswordPolicyService passwordPolicyService;
 
     @Test
     @WithAnonymousUser

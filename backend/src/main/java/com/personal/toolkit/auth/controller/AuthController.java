@@ -2,11 +2,15 @@ package com.personal.toolkit.auth.controller;
 
 import com.personal.toolkit.auth.dto.AuthLoginRequest;
 import com.personal.toolkit.auth.dto.AuthLoginPolicyResponse;
+import com.personal.toolkit.auth.dto.AuthChangePasswordRequest;
 import com.personal.toolkit.auth.dto.AuthRegisterRequest;
 import com.personal.toolkit.auth.dto.AuthTokenResponse;
 import com.personal.toolkit.auth.dto.CaptchaResponse;
+import com.personal.toolkit.auth.dto.SecurityPolicyResponse;
+import com.personal.toolkit.auth.dto.SecurityPolicyUpdateRequest;
 import com.personal.toolkit.auth.service.AuthAuditService;
 import com.personal.toolkit.auth.dto.UserProfileResponse;
+import com.personal.toolkit.auth.service.AppSecurityPolicyService;
 import com.personal.toolkit.auth.service.AuthService;
 import com.personal.toolkit.auth.service.CaptchaService;
 import com.personal.toolkit.common.api.ApiResponse;
@@ -18,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,13 +37,16 @@ public class AuthController {
     private final AuthService authService;
     private final CaptchaService captchaService;
     private final AuthAuditService authAuditService;
+    private final AppSecurityPolicyService appSecurityPolicyService;
 
     public AuthController(AuthService authService,
                           CaptchaService captchaService,
-                          AuthAuditService authAuditService) {
+                          AuthAuditService authAuditService,
+                          AppSecurityPolicyService appSecurityPolicyService) {
         this.authService = authService;
         this.captchaService = captchaService;
         this.authAuditService = authAuditService;
+        this.appSecurityPolicyService = appSecurityPolicyService;
     }
 
     /**
@@ -120,6 +128,44 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserProfileResponse>> me() {
         return ResponseEntity.ok(ApiResponse.success("Current user fetched successfully", authService.getCurrentUserProfile()));
+    }
+
+    /**
+     * 允许已登录用户在命中强制改密策略时仍可通过当前令牌完成自助改密。
+     *
+     * @param request 改密请求体
+     * @return 更新后的当前用户概要信息
+     */
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> changePassword(@Valid @RequestBody AuthChangePasswordRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully", authService.changePassword(request)));
+    }
+
+    /**
+     * 返回当前运行时安全策略，仅允许启动期放行名单中的用户访问。
+     *
+     * @return 安全策略响应
+     */
+    @GetMapping("/security-policy")
+    public ResponseEntity<ApiResponse<SecurityPolicyResponse>> getSecurityPolicy() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Security policy fetched successfully",
+                appSecurityPolicyService.getPolicyForCurrentUser()
+        ));
+    }
+
+    /**
+     * 更新当前运行时安全策略，仅允许启动期放行名单中的用户访问。
+     *
+     * @param request 安全策略更新请求
+     * @return 更新后的安全策略响应
+     */
+    @PutMapping("/security-policy")
+    public ResponseEntity<ApiResponse<SecurityPolicyResponse>> updateSecurityPolicy(@Valid @RequestBody SecurityPolicyUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Security policy updated successfully",
+                appSecurityPolicyService.updatePolicyForCurrentUser(request)
+        ));
     }
 
     /**

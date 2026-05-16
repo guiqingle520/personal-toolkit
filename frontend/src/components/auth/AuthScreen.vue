@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '../../composables/useAuth'
-import { fetchApi, type ApiError } from '../../api'
+import { fetchApi, toApiError } from '../../api'
 
 const { t } = useI18n()
 const { setSession } = useAuth()
@@ -40,7 +40,8 @@ async function loadLoginPolicy() {
     captchaImage.value = ''
     captchaCode.value = ''
     captchaLoadError.value = ''
-  } catch {
+  } catch (loadPolicyError) {
+    void loadPolicyError
     captchaEnabled.value = false
     adaptiveCaptcha.value = false
     adaptiveTriggerThreshold.value = 1
@@ -63,7 +64,8 @@ async function loadCaptcha() {
     captchaImage.value = res.data?.image ?? ''
     captchaCode.value = ''
     captchaLoadError.value = captchaImage.value ? '' : t('auth.captchaLoadFailed')
-  } catch {
+  } catch (loadCaptchaError) {
+    void loadCaptchaError
     captchaId.value = ''
     captchaImage.value = ''
     captchaLoadError.value = t('auth.captchaLoadFailed')
@@ -81,7 +83,7 @@ async function submit() {
       ? { username: username.value, password: password.value, captchaId: captchaId.value, captchaCode: captchaCode.value }
       : { username: username.value, email: email.value, password: password.value }
 
-    const res = await fetchApi<{ token: string; user?: { id: number; username: string; email?: string } }>(endpoint, {
+    const res = await fetchApi<{ token: string; user?: { id: number; username: string; email?: string; passwordChangeRequired?: boolean } }>(endpoint, {
       method: 'POST',
       body: JSON.stringify(body)
     }, t)
@@ -91,23 +93,15 @@ async function submit() {
     }
   } catch (error) {
     if (error instanceof Error) {
-      try {
-        const parsed = JSON.parse(error.message) as ApiError
-        if (parsed.code === 'CAPTCHA_REQUIRED' && captchaEnabled.value) {
-          showCaptcha.value = true
-          await loadCaptcha()
-        } else if (isLogin.value && showCaptcha.value) {
-          await loadCaptcha()
-        }
-        errorMessage.value = parsed.message || t('feedback.genericError')
-        validationErrors.value = parsed.validation || {}
-      } catch {
-        if (isLogin.value && showCaptcha.value) {
-          await loadCaptcha()
-        }
-        errorMessage.value = error.message
-        validationErrors.value = {}
+      const apiError = toApiError(error, t('feedback.genericError'))
+      if (apiError.code === 'CAPTCHA_REQUIRED' && captchaEnabled.value) {
+        showCaptcha.value = true
+        await loadCaptcha()
+      } else if (isLogin.value && showCaptcha.value) {
+        await loadCaptcha()
       }
+      errorMessage.value = apiError.message || t('feedback.genericError')
+      validationErrors.value = apiError.validation || {}
     } else {
       if (isLogin.value && showCaptcha.value) {
         await loadCaptcha()
@@ -222,28 +216,35 @@ if (isLogin.value) {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 80vh;
+  flex: 1;
+  padding: 96px 16px 64px;
+  background: var(--color-app-bg);
 }
 .auth-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 32px;
+  background: color-mix(in srgb, var(--color-surface-base) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, rgba(var(--color-primary-rgb), 0.16));
+  border-radius: var(--radius-lg);
+  padding: 48px;
   width: 100%;
-  max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-width: 460px;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .auth-title {
   margin-top: 0;
-  margin-bottom: 24px;
+  margin-bottom: 40px;
   text-align: center;
-  color: var(--text-primary);
-  font-size: 1.5rem;
+  color: var(--color-text-strong);
+  font-size: 2rem;
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 .form-group {
   display: flex;
@@ -251,64 +252,71 @@ if (isLogin.value) {
   gap: 8px;
 }
 .form-group label {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 .captcha-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 .captcha-image {
   height: 40px;
   min-width: 120px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-input);
 }
 .captcha-placeholder {
   min-width: 120px;
   min-height: 40px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   padding: 0 10px;
-  border: 1px dashed var(--border-color);
-  border-radius: 4px;
-  color: var(--text-secondary);
-  background: rgba(0, 0, 0, 0.08);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: var(--color-surface-hover);
   font-size: 0.85rem;
 }
 .auth-submit {
   margin-top: 8px;
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   font-size: 1rem;
 }
 .auth-toggle {
-  margin-top: 24px;
+  margin-top: 28px;
   text-align: center;
   font-size: 0.9rem;
-  color: var(--text-secondary);
+  color: var(--color-text-normal);
 }
 .auth-toggle a {
-  color: var(--primary-color);
+  color: var(--color-primary);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
 }
 .auth-toggle a:hover {
-  text-decoration: underline;
+  text-decoration: none;
+  color: var(--color-primary-dark);
 }
-.error-banner {
-  margin-top: 8px;
-  padding: 12px;
-  background: rgba(255, 68, 68, 0.1);
-  border-left: 4px solid var(--danger-color, #ff4444);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  border-radius: 4px;
-}
-.validation-list {
-  margin: 8px 0 0 0;
-  padding-left: 20px;
+
+@media (max-width: 640px) {
+  .auth-screen {
+    padding: 56px 12px 28px;
+  }
+
+  .auth-card {
+    padding: 32px 24px;
+  }
+
+  .auth-title {
+    font-size: 1.7rem;
+    margin-bottom: 32px;
+  }
 }
 </style>

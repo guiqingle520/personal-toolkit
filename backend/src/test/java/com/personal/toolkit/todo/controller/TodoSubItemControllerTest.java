@@ -6,6 +6,7 @@ import com.personal.toolkit.auth.security.AppUserDetailsService;
 import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
 import com.personal.toolkit.auth.security.JwtTokenService;
 import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
+import com.personal.toolkit.auth.service.PasswordPolicyService;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import com.personal.toolkit.todo.dto.TodoSubItemRequest;
 import com.personal.toolkit.todo.dto.TodoSubItemResponse;
@@ -62,6 +63,9 @@ class TodoSubItemControllerTest {
 
     @MockBean
     private AppUserDetailsService appUserDetailsService;
+
+    @MockBean
+    private PasswordPolicyService passwordPolicyService;
 
     /**
      * 未认证访问 checklist 接口时应返回统一 401 错误响应。

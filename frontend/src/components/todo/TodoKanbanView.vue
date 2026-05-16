@@ -107,6 +107,7 @@ function handleDrop(columnKey: 'PENDING' | 'DONE') {
           @dragend="handleDragEnd"
         >
         <TodoItemRow
+          tag="div"
           :todo="todo"
           :isSelected="selectedIds.includes(todo.id)"
           :categoryListId="categoryListId"
@@ -140,3 +141,132 @@ function handleDrop(columnKey: 'PENDING' | 'DONE') {
     </div>
   </section>
 </template>
+
+<style scoped>
+.kanban-board {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  padding: 16px 28px;
+  height: 100%;
+  align-items: flex-start;
+}
+
+.kanban-column {
+  flex: 1;
+  min-width: 320px;
+  max-width: 400px;
+  background: rgba(15, 15, 15, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.kanban-column::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background 0.3s ease;
+}
+
+.kanban-column--PENDING::after {
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  opacity: 0.3;
+}
+
+.kanban-column--DONE::after {
+  background: linear-gradient(90deg, transparent, var(--color-success), transparent);
+  opacity: 0.2;
+}
+
+.kanban-column.is-drag-over {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.1) inset;
+}
+
+.kanban-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.kanban-column-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-bright, #fff);
+  text-transform: uppercase;
+}
+
+.kanban-column-list {
+  list-style: none;
+  padding: 12px;
+  margin: 0;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kanban-column-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kanban-column-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.kanban-card-shell {
+  cursor: grab;
+  border-radius: var(--radius-md);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease;
+}
+
+.kanban-card-shell:active {
+  cursor: grabbing;
+}
+
+.kanban-card-shell.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+}
+
+.kanban-card-shell :deep(.todo-item) {
+  margin-bottom: 0; /* Remove margin since gap handles it */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.kanban-card-shell:hover :deep(.todo-item) {
+  border-color: rgba(212, 175, 55, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.kanban-empty-state {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--color-text-muted, #888);
+  font-style: italic;
+  font-size: 0.85rem;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  margin: 12px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.1);
+}
+</style>

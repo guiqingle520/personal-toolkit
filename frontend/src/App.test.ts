@@ -68,6 +68,7 @@ describe('App account menu', () => {
 
     expect(wrapper.text()).toContain('Account Management')
     expect(wrapper.text()).toContain('Theme Settings')
+    expect(wrapper.text()).toContain('Security Settings')
 
     const themeButtons = wrapper.findAll('.app-theme-option')
     await themeButtons[2].trigger('click')

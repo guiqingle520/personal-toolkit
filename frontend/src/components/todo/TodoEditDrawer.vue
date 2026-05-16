@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import LocalizedDateInput from './LocalizedDateInput.vue'
 import type { TodoDraft } from './types'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
   editForm: TodoDraft
   categoryListId: string
@@ -10,17 +11,65 @@ defineProps<{
   submitting: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'update:editForm', value: TodoDraft): void
   (e: 'save'): void
   (e: 'cancel'): void
 }>()
+
+const drawerRef = ref<HTMLElement | null>(null)
+let previousFocus: HTMLElement | null = null
+
+watch(() => props.isOpen, async (newVal) => {
+  if (newVal) {
+    previousFocus = document.activeElement as HTMLElement
+    await nextTick()
+    const input = drawerRef.value?.querySelector('input[autofocus]') as HTMLElement
+    if (input) input.focus()
+  } else if (previousFocus) {
+    previousFocus.focus()
+    previousFocus = null
+  }
+})
+
+onUnmounted(() => {
+  if (previousFocus) {
+    previousFocus.focus()
+  }
+})
+
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    emit('cancel')
+    e.stopPropagation()
+  } else if (e.key === 'Tab') {
+    if (!drawerRef.value) return
+    const focusableElements = drawerRef.value.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusableElements.length === 0) return
+    const first = focusableElements[0]
+    const last = focusableElements[focusableElements.length - 1]
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        last.focus()
+        e.preventDefault()
+      }
+    } else {
+      if (document.activeElement === last) {
+        first.focus()
+        e.preventDefault()
+      }
+    }
+  }
+}
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="drawer">
-      <div v-if="isOpen" class="todo-edit-drawer-overlay" @click.self="$emit('cancel')">
+      <div v-if="isOpen" ref="drawerRef" class="todo-edit-drawer-overlay" @click.self="$emit('cancel')" @keydown="handleKeydown">
         <div class="todo-edit-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
           <header class="drawer-header">
             <h2 id="drawer-title" class="drawer-title">{{ $t('action.edit') }}</h2>
@@ -29,7 +78,7 @@ defineEmits<{
 
           <div class="drawer-body">
             <div class="edit-mode">
-              <input :value="editForm.title" type="text" class="cyber-input form-sm" :placeholder="$t('form.title')" autofocus @input="$emit('update:editForm', { ...editForm, title: ($event.target as HTMLInputElement).value })" />
+              <input :value="editForm.title" type="text" class="cyber-input form-sm title-input" :placeholder="$t('form.title')" autofocus @input="$emit('update:editForm', { ...editForm, title: ($event.target as HTMLInputElement).value })" />
               <div class="edit-row">
                 <select :value="editForm.priority" class="cyber-input form-sm" @change="$emit('update:editForm', { ...editForm, priority: Number(($event.target as HTMLSelectElement).value) })">
                   <option :value="1">{{ $t('priority.backlog') }}</option>
@@ -82,8 +131,8 @@ defineEmits<{
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
   z-index: 1000;
   display: flex;
   justify-content: flex-end;
@@ -91,13 +140,13 @@ defineEmits<{
 
 .todo-edit-drawer {
   width: 100%;
-  max-width: 480px;
-  background: var(--color-surface-base);
+  max-width: 540px;
+  background: rgba(12, 12, 12, 0.95);
   height: 100%;
   display: flex;
   flex-direction: column;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
-  border-left: 1px solid var(--color-border-subtle);
+  box-shadow: -12px 0 64px rgba(0, 0, 0, 0.7), -1px 0 0 rgba(212, 175, 55, 0.15);
+  border: none;
   overflow: hidden;
 }
 
@@ -105,40 +154,49 @@ defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 28px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+  padding: 32px 40px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.05), transparent);
 }
 
 .drawer-title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--color-text-strong);
-  letter-spacing: -0.01em;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--color-primary, #d4af37);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .drawer-close {
   background: transparent;
   border: none;
-  color: var(--color-text-muted);
-  font-size: 1.6rem;
+  color: var(--color-text-muted, #888);
+  font-size: 1.8rem;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
   line-height: 1;
   border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
 }
 
 .drawer-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-text-bright);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-primary);
 }
 
 .drawer-body {
   flex: 1;
   overflow-y: auto;
-  padding: 28px;
+  padding: 40px;
+}
+
+.drawer-body::-webkit-scrollbar {
+  width: 6px;
+}
+.drawer-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 .edit-mode {
@@ -149,21 +207,21 @@ defineEmits<{
 }
 
 .drawer-footer {
-  padding: 20px 28px;
-  border-top: 1px solid var(--color-border-subtle);
+  padding: 24px 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .drawer-enter-active,
 .drawer-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .drawer-enter-active .todo-edit-drawer,
 .drawer-leave-active .todo-edit-drawer {
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .drawer-enter-from,
@@ -178,7 +236,7 @@ defineEmits<{
 .edit-row {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 20px;
+  margin-top: 24px;
 }
 </style>

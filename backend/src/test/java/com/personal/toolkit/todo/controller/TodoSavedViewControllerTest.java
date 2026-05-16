@@ -6,6 +6,7 @@ import com.personal.toolkit.auth.security.AppUserDetailsService;
 import com.personal.toolkit.auth.security.JwtAuthenticationFilter;
 import com.personal.toolkit.auth.security.JwtTokenService;
 import com.personal.toolkit.auth.security.RestAuthenticationEntryPoint;
+import com.personal.toolkit.auth.service.PasswordPolicyService;
 import com.personal.toolkit.common.exception.GlobalExceptionHandler;
 import com.personal.toolkit.todo.dto.TodoSavedViewRequest;
 import com.personal.toolkit.todo.dto.TodoSavedViewResponse;
@@ -58,6 +59,9 @@ class TodoSavedViewControllerTest {
 
     @MockBean
     private AppUserDetailsService appUserDetailsService;
+
+    @MockBean
+    private PasswordPolicyService passwordPolicyService;
 
     @Test
     @WithAnonymousUser

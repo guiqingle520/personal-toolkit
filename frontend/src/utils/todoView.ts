@@ -111,7 +111,10 @@ export function parseTodoUrlState(search: string): TodoUrlState {
  */
 export function hasMeaningfulTodoQuery(search: string): boolean {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
-  return SYNCED_FILTER_KEYS.some((key) => params.has(key)) || params.has('viewMode') || params.has('displayMode')
+  return SYNCED_FILTER_KEYS.some((key) => params.has(key))
+    || params.has('viewMode')
+    || params.has('displayMode')
+    || params.has('options')
 }
 
 /**

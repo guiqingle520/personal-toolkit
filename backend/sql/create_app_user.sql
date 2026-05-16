@@ -9,6 +9,8 @@ CREATE TABLE app_user (
     username VARCHAR2(100 CHAR) NOT NULL,
     email VARCHAR2(255 CHAR) NOT NULL,
     password_hash VARCHAR2(255 CHAR) NOT NULL,
+    password_change_required NUMBER(1) DEFAULT 0 NOT NULL,
+    password_changed_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
     create_time TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
     update_time TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT uk_app_user_username UNIQUE (username),
@@ -19,6 +21,8 @@ COMMENT ON TABLE app_user IS '应用登录用户表';
 COMMENT ON COLUMN app_user.username IS '登录用户名';
 COMMENT ON COLUMN app_user.email IS '登录邮箱';
 COMMENT ON COLUMN app_user.password_hash IS 'BCrypt 密码哈希';
+COMMENT ON COLUMN app_user.password_change_required IS '是否要求用户在放行其他接口前先修改密码';
+COMMENT ON COLUMN app_user.password_changed_at IS '密码最近一次修改时间';
 COMMENT ON COLUMN app_user.create_time IS '创建时间';
 COMMENT ON COLUMN app_user.update_time IS '更新时间';
 

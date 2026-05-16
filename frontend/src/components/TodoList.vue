@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -120,6 +120,13 @@ const checklistPendingSubItemIdsByTodoId = ref<Record<number, number[]>>({})
 const syncingFromUrl = ref(false)
 let infoMessageTimer: ReturnType<typeof setTimeout> | null = null
 const hiddenCreatedTodoId = ref<number | null>(null)
+const isCreateModalOpen = ref(false)
+const createModalOverlayRef = ref<HTMLElement | null>(null)
+const createModalDialogRef = ref<HTMLElement | null>(null)
+const createModalTriggerRef = ref<HTMLButtonElement | null>(null)
+let lastFocusedCreateTrigger: HTMLElement | null = null
+
+const CREATE_MODAL_FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 const isAllSelected = computed({
   get: () => todos.value.length > 0 && selectedIds.value.length === todos.value.length,
@@ -245,6 +252,91 @@ function dismissInfoMessage() {
   if (infoMessageTimer) {
     clearTimeout(infoMessageTimer)
     infoMessageTimer = null
+  }
+}
+
+function getCreateModalFocusableElements() {
+  return Array.from(createModalDialogRef.value?.querySelectorAll<HTMLElement>(CREATE_MODAL_FOCUSABLE_SELECTOR) || [])
+}
+
+function focusCreateModalPrimaryField() {
+  nextTick(() => {
+    const primaryField = createModalDialogRef.value?.querySelector<HTMLInputElement>('input[type="text"]:not([disabled])')
+    if (primaryField) {
+      primaryField.focus()
+      return
+    }
+
+    const [firstField] = getCreateModalFocusableElements()
+    if (firstField) {
+      firstField.focus()
+      return
+    }
+
+    createModalDialogRef.value?.focus()
+  })
+}
+
+function openCreateModal(event?: MouseEvent) {
+  lastFocusedCreateTrigger = event?.currentTarget instanceof HTMLElement
+    ? event.currentTarget
+    : createModalTriggerRef.value
+  isCreateModalOpen.value = true
+}
+
+function closeCreateModal(options: { force?: boolean } = {}) {
+  if (submitting.value && !options.force) {
+    return
+  }
+
+  isCreateModalOpen.value = false
+}
+
+function restoreCreateTriggerFocus() {
+  nextTick(() => {
+    const focusTarget = lastFocusedCreateTrigger ?? createModalTriggerRef.value
+    focusTarget?.focus()
+    lastFocusedCreateTrigger = null
+  })
+}
+
+function handleCreateModalKeydown(event: KeyboardEvent) {
+  if (!isCreateModalOpen.value) {
+    return
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeCreateModal()
+    return
+  }
+
+  if (event.key !== 'Tab') {
+    return
+  }
+
+  const focusableElements = getCreateModalFocusableElements()
+  if (focusableElements.length === 0) {
+    event.preventDefault()
+    createModalDialogRef.value?.focus()
+    return
+  }
+
+  const first = focusableElements[0]
+  const last = focusableElements[focusableElements.length - 1]
+  const activeElement = document.activeElement
+
+  if (event.shiftKey) {
+    if (activeElement === first || activeElement === createModalDialogRef.value) {
+      event.preventDefault()
+      last.focus()
+    }
+    return
+  }
+
+  if (activeElement === last) {
+    event.preventDefault()
+    first.focus()
   }
 }
 
@@ -719,6 +811,7 @@ async function createTodo() {
       showInfoMessage(t('feedback.createdTodoHiddenByFilters'))
     }
     newTodo.value = { title: '', priority: 3, category: '', dueDate: '', remindAt: '', tags: '', notes: '', attachmentLinks: '', ownerLabel: '', collaborators: '', watchers: '', recurrenceType: '', recurrenceInterval: 1, recurrenceEndTime: '' }
+    closeCreateModal({ force: true })
   } catch (error) {
     handleError(error)
   } finally {
@@ -864,6 +957,15 @@ onBeforeUnmount(() => {
   if (infoMessageTimer) {
     clearTimeout(infoMessageTimer)
   }
+})
+
+watch(isCreateModalOpen, (isOpen) => {
+  if (isOpen) {
+    focusCreateModalPrimaryField()
+    return
+  }
+
+  restoreCreateTriggerFocus()
 })
 
 watch(
@@ -1055,11 +1157,8 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
 </script>
 
 <template>
-  <section class="todo-panel">
-    <div class="glass-bg"></div>
-    <div class="content-wrapper">
-      <TodoWorkbenchLayout>
-        <template #header>
+  <TodoWorkbenchLayout>
+    <template #header>
         <TodoToolbar
           :displayMode="displayMode"
           @update:displayMode="handleDisplayModeUpdate" 
@@ -1101,17 +1200,59 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
             :show="showOptionsPanel"
           />
 
-          <TodoCreateForm 
-            v-if="displayMode === 'LIST'"
-            :newTodo="newTodo"
-            :submitting="submitting"
-            :categoryListId="CATEGORY_LIST_ID"
-            :tagListId="TAG_LIST_ID"
-            @update:newTodo="handleNewTodoUpdate"
-            @createTodo="createTodo"
-          />
+          <div class="list-actions-bar" v-if="displayMode === 'LIST'">
+            <button ref="createModalTriggerRef" class="btn btn-primary" @click="openCreateModal($event)">
+              {{ $t('form.addTask') }}
+            </button>
+          </div>
 
-          <div v-if="errorMessage" class="error-banner">
+          <Teleport to="body">
+            <Transition name="modal">
+              <div
+                v-if="isCreateModalOpen"
+                ref="createModalOverlayRef"
+                class="todo-create-modal-overlay"
+                @click.self="closeCreateModal()"
+              >
+                <div
+                  ref="createModalDialogRef"
+                  class="todo-create-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="create-modal-title"
+                  tabindex="-1"
+                  @keydown="handleCreateModalKeydown"
+                >
+                  <header class="modal-header">
+                    <h2 id="create-modal-title" class="modal-title">{{ $t('form.addTask') }}</h2>
+                    <button type="button" class="modal-close" :aria-label="$t('form.cancel')" :disabled="submitting" @click="closeCreateModal()">×</button>
+                  </header>
+
+                  <div class="modal-body">
+                    <div v-if="errorMessage" class="error-banner error-banner-inline">
+                      <strong>{{ $t('status.error') }}</strong> {{ errorMessage }}
+                      <ul v-if="Object.keys(validationErrors).length > 0" class="validation-list">
+                        <li v-for="(errors, field) in validationErrors" :key="field">
+                          {{ field }}: {{ errors.join(', ') }}
+                        </li>
+                      </ul>
+                    </div>
+
+                    <TodoCreateForm 
+                      :newTodo="newTodo"
+                      :submitting="submitting"
+                      :categoryListId="CATEGORY_LIST_ID"
+                      :tagListId="TAG_LIST_ID"
+                      @update:newTodo="handleNewTodoUpdate"
+                      @createTodo="createTodo"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </Teleport>
+
+          <div v-if="errorMessage && !isCreateModalOpen" class="error-banner">
             <strong>{{ $t('status.error') }}</strong> {{ errorMessage }}
             <ul v-if="Object.keys(validationErrors).length > 0" class="validation-list">
               <li v-for="(errors, field) in validationErrors" :key="field">
@@ -1262,6 +1403,120 @@ async function deleteSubItem(todoId: number, item: TodoSubItem) {
           />
         </template>
       </TodoWorkbenchLayout>
-    </div>
-  </section>
 </template>
+
+<style scoped>
+.list-actions-bar {
+  padding: 16px 28px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.todo-create-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.todo-create-modal {
+  width: 100%;
+  max-width: 640px;
+  background: rgba(12, 12, 12, 0.95);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 175, 55, 0.15);
+  border: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.05), transparent);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--color-primary, #d4af37);
+  letter-spacing: 0.02em;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #888);
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-primary);
+}
+
+.modal-body {
+  padding: 32px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.error-banner-inline {
+  margin-bottom: 20px;
+}
+
+.modal-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-enter-active .todo-create-modal,
+.modal-leave-active .todo-create-modal {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-from .todo-create-modal {
+  transform: scale(0.95) translateY(10px);
+}
+
+.modal-leave-to .todo-create-modal {
+  transform: scale(0.98) translateY(-5px);
+}
+</style>
+

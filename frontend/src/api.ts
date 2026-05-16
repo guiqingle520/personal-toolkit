@@ -14,7 +14,88 @@ export interface ApiError {
   validation?: Record<string, string[]>
 }
 
-export async function fetchApi<T>(url: string, options?: RequestInit, t?: (key: string, args?: any) => string): Promise<ApiResponse<T>> {
+type TranslationArgs = Record<string, unknown>
+
+export class ApiRequestError extends Error {
+  readonly apiError: ApiError
+
+  constructor(apiError: ApiError) {
+    super(apiError.message)
+    this.name = 'ApiRequestError'
+    this.apiError = apiError
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isValidationMap(value: unknown): value is Record<string, string[]> {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  return Object.values(value).every((entry) => Array.isArray(entry) && entry.every((item) => typeof item === 'string'))
+}
+
+function normalizeApiError(value: unknown): ApiError | null {
+  if (!isRecord(value) || typeof value.message !== 'string') {
+    return null
+  }
+
+  return {
+    code: typeof value.code === 'string' ? value.code : undefined,
+    message: value.message,
+    status: typeof value.status === 'number' ? value.status : undefined,
+    validation: isValidationMap(value.validation) ? value.validation : undefined,
+  }
+}
+
+function parseApiErrorMessage(message: string): ApiError | null {
+  try {
+    return normalizeApiError(JSON.parse(message))
+  } catch (parseError) {
+    void parseError
+    return null
+  }
+}
+
+export function toApiError(error: unknown, fallbackMessage: string): ApiError {
+  if (error instanceof ApiRequestError) {
+    return error.apiError
+  }
+
+  if (error instanceof Error) {
+    const parsedFromMessage = parseApiErrorMessage(error.message)
+    if (parsedFromMessage) {
+      return parsedFromMessage
+    }
+
+    return {
+      message: error.message || fallbackMessage,
+    }
+  }
+
+  const normalized = normalizeApiError(error)
+  if (normalized) {
+    const parsedFromMessage = parseApiErrorMessage(normalized.message)
+    if (parsedFromMessage) {
+      return {
+        ...parsedFromMessage,
+        code: parsedFromMessage.code ?? normalized.code,
+        validation: parsedFromMessage.validation ?? normalized.validation,
+      }
+    }
+
+    return normalized
+  }
+
+  return {
+    message: fallbackMessage,
+  }
+}
+
+export async function fetchApi<T>(url: string, options?: RequestInit, t?: (key: string, args?: TranslationArgs) => string): Promise<ApiResponse<T>> {
   const { token, clearToken } = useAuth()
   
   const headers: Record<string, string> = {
@@ -43,18 +124,19 @@ export async function fetchApi<T>(url: string, options?: RequestInit, t?: (key: 
   let data
   try {
     data = await res.json()
-  } catch {
+  } catch (parseError) {
+    void parseError
     data = null
   }
   
   if (!res.ok) {
     const errorMsg = data?.message || (t ? t('feedback.httpError', { status: res.status }) : `HTTP Error ${res.status}`)
-    throw new Error(JSON.stringify({
+    throw new ApiRequestError({
       code: data?.code,
       message: errorMsg,
       status: data?.status ?? res.status,
       validation: data?.validation
-    }))
+    })
   }
   
   return data as ApiResponse<T>

@@ -33,6 +33,12 @@ public class AppUser {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
+    @Column(name = "password_change_required", nullable = false)
+    private boolean passwordChangeRequired;
+
+    @Column(name = "password_changed_at", nullable = false)
+    private LocalDateTime passwordChangedAt;
+
     @Column(name = "create_time", nullable = false)
     private LocalDateTime createTime;
 
@@ -112,6 +118,42 @@ public class AppUser {
     }
 
     /**
+     * 返回当前用户是否被要求先修改密码。
+     *
+     * @return 是否要求修改密码
+     */
+    public boolean isPasswordChangeRequired() {
+        return passwordChangeRequired;
+    }
+
+    /**
+     * 设置当前用户是否被要求先修改密码。
+     *
+     * @param passwordChangeRequired 是否要求修改密码
+     */
+    public void setPasswordChangeRequired(boolean passwordChangeRequired) {
+        this.passwordChangeRequired = passwordChangeRequired;
+    }
+
+    /**
+     * 返回当前密码最近一次变更时间。
+     *
+     * @return 密码变更时间
+     */
+    public LocalDateTime getPasswordChangedAt() {
+        return passwordChangedAt;
+    }
+
+    /**
+     * 设置当前密码最近一次变更时间。
+     *
+     * @param passwordChangedAt 密码变更时间
+     */
+    public void setPasswordChangedAt(LocalDateTime passwordChangedAt) {
+        this.passwordChangedAt = passwordChangedAt;
+    }
+
+    /**
      * 返回用户创建时间。
      *
      * @return 创建时间
@@ -155,6 +197,9 @@ public class AppUser {
         LocalDateTime now = LocalDateTime.now();
         this.createTime = now;
         this.updateTime = now;
+        if (this.passwordChangedAt == null) {
+            this.passwordChangedAt = now;
+        }
     }
 
     /**

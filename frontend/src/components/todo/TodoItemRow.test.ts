@@ -66,4 +66,31 @@ describe('TodoItemRow', () => {
     await wrapper.find('.checklist-toggle-btn').trigger('click')
     expect(wrapper.emitted('toggleChecklist')).toHaveLength(1)
   })
+
+  it('exposes todo-specific accessible names for selection and row actions', () => {
+    const wrapper = mountWithI18n(TodoItemRow, {
+      props: {
+        todo: createTodo(),
+        isSelected: false,
+        categoryListId: 'category-options',
+        tagListId: 'tag-options',
+        viewMode: 'ACTIVE',
+        submitting: false,
+        checklistExpanded: false,
+        checklistItems: [],
+        checklistSummary: createSummary(),
+        checklistDraftTitle: '',
+        checklistLoading: false,
+        checklistCreating: false,
+        checklistPendingIds: [],
+      },
+    })
+
+    expect(wrapper.find('.todo-select-checkbox').attributes('aria-labelledby')).toBe('todo-title-1')
+    expect(wrapper.find('#todo-title-1').text()).toBe('Parent task')
+    expect(wrapper.find('.status-toggle').attributes('aria-label')).toBe('Mark as Done: Parent task')
+    expect(wrapper.find('.checklist-toggle-btn').attributes('aria-label')).toBe('Show checklist: Parent task')
+    expect(wrapper.find('.edit-btn').attributes('aria-label')).toBe('Edit: Parent task')
+    expect(wrapper.find('.delete-btn').attributes('aria-label')).toBe('Delete: Parent task')
+  })
 })
